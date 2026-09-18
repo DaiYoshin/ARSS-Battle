@@ -83,7 +83,7 @@ function startRecording(){
   recorder.onerror=()=>{recordingFailed=true;recordStatus.textContent='録画中にエラーが発生しました。';if(recorder.state!=='inactive')stopRecording();else{recordingStream.getTracks().forEach(track=>track.stop());recordButton.disabled=false;recordButton.textContent='録画して再戦';}};
   recordButton.textContent='録画を停止';
   recordStatus.textContent=recordFromSelect?'録画中… キャラ選択からリザルトまで収録します。':'録画中… 2本先取の試合終了後に自動停止します。';
- }catch(e){recordingStream?.getTracks().forEach(track=>track.stop());recordButton.disabled=false;recordButton.textContent='録画して再戦';recordStatus.textContent=e.name==='SecurityError'||/tainted/i.test(e.message)?'画像の読み込み元により録画が制限されています。sprite-playground.html（画像埋め込み版）を開き直してください。':'録画を開始できませんでした：'+e.message;}
+ }catch(e){recordingStream?.getTracks().forEach(track=>track.stop());recordButton.disabled=false;recordButton.textContent='録画して再戦';recordStatus.textContent=e.name==='SecurityError'||/tainted/i.test(e.message)?'画像の読み込み元により録画が制限されています。READMEの起動手順で開き直してください。':'録画を開始できませんでした：'+e.message;}
 }
 recordButton.onclick=startRecording;
 function setPaused(value){

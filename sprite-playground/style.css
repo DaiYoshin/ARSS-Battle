@@ -29,3 +29,5 @@ main[data-screen="result"]>footer{display:none}
 main:not([data-screen="battle"])>header{display:none}header{justify-content:flex-end}
 
 main[data-screen="select"]>.record-controls:has(#recordDownload:not([hidden])){display:flex}main[data-screen="select"]>.record-controls #record,main[data-screen="select"]>.record-controls #sound{display:none}
+
+#local-start-help{max-width:900px;margin:40px auto;padding:24px}#local-start-help pre{white-space:pre-wrap;overflow-wrap:anywhere}#local-start-help a{color:#80d7cf}

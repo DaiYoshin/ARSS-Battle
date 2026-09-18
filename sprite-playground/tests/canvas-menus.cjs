@@ -7,6 +7,14 @@ const root=path.resolve(__dirname,'..'),output=path.join(root,'../.qa-canvas');
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
  try{
  browser=await chromium.launch({headless:true});
+ const localPage=await browser.newPage();
+ await localPage.goto('file://'+path.join(root,'index.html'));
+ await localPage.waitForSelector('#local-start-help');
+ assert(localPage.url().endsWith('/sprite-playground/index.html'));
+ assert(await localPage.locator('main').isHidden());
+ assert((await localPage.locator('#local-start-help').textContent()).includes('python3 -m http.server'));
+ await localPage.close();
+ console.log('PASS: direct source HTML shows startup instructions without redirect');
  for(const standalone of [false,true]){
   const page=await browser.newPage({viewport:{width:1200,height:820},hasTouch:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(standalone?'file://'+path.join(root,'../sprite-playground.html'):'http://127.0.0.1:'+server.address().port+'/');
