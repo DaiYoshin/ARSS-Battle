@@ -17,6 +17,7 @@ document.getElementById('difficulty').addEventListener('change',e=>{enemyAI.diff
 let result=null,countdown=3,fightCueTime=0,remainingTime=90,paused=false,selecting=true;
 let menuFocus=null,menuHover=null,menuPointer=null,assetError='';
 let screen='title',roundNumber=1,roundWins=[0,0],roundHistory=[],roundEndTime=0;
+let playMode='vs',arcadeOpponents=[],arcadeMatchIndex=0,arcadeResults=[];
 let transformationTarget=null;
 let effects=[],hitStop=0;
 let audioContext=null,soundEnabled=false;
@@ -108,7 +109,7 @@ function resetRound(){
  document.getElementById('pause').textContent='一時停止 (Esc)';keys.left=keys.right=keys.dash=keys.guard=false;
 }
 function reset(){if(!(['select','stage'].includes(screen)&&recordFromSelect&&recorder?.state==='recording'))stopRecording();roundNumber=1;roundWins=[0,0];roundHistory=[];resetRound();setScreen('battle');canvas.focus?.();}
-function showTitle(){stopRecording();resetRound();roundNumber=1;roundWins=[0,0];roundHistory=[];setScreen('title');canvas.focus?.();}
+function showTitle(){stopRecording();playMode='vs';arcadeResults=[];resetRound();roundNumber=1;roundWins=[0,0];roundHistory=[];setScreen('title');canvas.focus?.();}
 function finishRound(){
  fightCueTime=0;
  if(result==='YOU WIN')roundWins[0]++;
@@ -119,10 +120,16 @@ function finishRound(){
  if(winner?.appearance==='green'&&roundWins[winner===actor?0:1]===2&&rosterIds.includes(loser.appearance)&&loser.gameOver&&loser.hp===0)transformationTarget=loser;
 }
 function showMatchResult(){
+ if(playMode==='arcade'){
+  const won=roundWins[0]===2;
+  arcadeResults.push({opponent:enemy.appearance,won});
+  if(won&&arcadeMatchIndex<2){arcadeMatchIndex++;startArcadeMatch();return;}
+ }
  if(!recordFromSelect)stopRecording();resultRecordTime=0;setScreen('result');
- document.getElementById('matchOutcome').textContent=roundWins[0]===2?'YOU WIN':'YOU LOSE';
- document.getElementById('matchScore').textContent=roundWins[0]+' − '+roundWins[1];
- document.getElementById('matchSummary').textContent=roundHistory.map(r=>'第'+r.round+'ラウンド：'+(r.result==='DRAW'?'引き分け（再試合）':r.result==='YOU WIN'?'あなたの勝ち':'CPUの勝ち')).join(' ／ ');
+ const won=roundWins[0]===2;
+ document.getElementById('matchOutcome').textContent=playMode==='arcade'?(won?'ARCADE CLEAR':'ARCADE OVER'):(won?'YOU WIN':'YOU LOSE');
+ document.getElementById('matchScore').textContent=playMode==='arcade'?arcadeResults.filter(match=>match.won).length+' / 3':roundWins[0]+' − '+roundWins[1];
+ document.getElementById('matchSummary').textContent=playMode==='arcade'?arcadeResults.map((match,i)=>'第'+(i+1)+'戦：'+fighterNames[match.opponent]+' '+(match.won?'勝利':'敗北')).join(' ／ '):roundHistory.map(r=>'第'+r.round+'ラウンド：'+(r.result==='DRAW'?'引き分け（再試合）':r.result==='YOU WIN'?'あなたの勝ち':'CPUの勝ち')).join(' ／ ');
  canvas.focus?.();
 }
 function advanceFrame(dt){
@@ -267,7 +274,7 @@ function draw(p){
   const guardWidth=410*Math.max(0,c.guardMeter)/100;ctx.fillRect(right?x+410-guardWidth:x,71,guardWidth,5);
   menuText('●'.repeat(roundWins[right?1:0])+'○'.repeat(2-roundWins[right?1:0]),right?1072:x,95,18,UI.gold,right?'right':'left');
  }
- menuText('ROUND '+roundNumber,550,29,15,UI.gold);
+ menuText(playMode==='arcade'?'ARCADE '+(arcadeMatchIndex+1)+' / 3':'ROUND '+roundNumber,550,29,15,UI.gold);
  menuText(String(Math.ceil(remainingTime)).padStart(2,'0'),550,73,42,UI.text);
  for(const e of effects){
   ctx.save();ctx.translate(e.x,e.y);ctx.globalAlpha=Math.min(1,e.life*8);ctx.strokeStyle=e.blocked?'#8de7f0':'#fff5a3';ctx.lineWidth=4;
@@ -284,11 +291,32 @@ function draw(p){
 
 }
 const rosterIds=['mascot','green','gray','blackcat','headset','fish','white'];
+function arcadeOpponentIds(playerId){
+ const start=rosterIds.indexOf(playerId),opponents=[];
+ for(let offset=1;opponents.length<3;offset++){const id=rosterIds[(start+offset)%rosterIds.length];if(id!==playerId)opponents.push(id);}
+ return opponents;
+}
+function syncArcadePreview(){
+ arcadeOpponents=arcadeOpponentIds(actor.appearance);arcadeMatchIndex=0;enemy.appearance=arcadeOpponents[0];
+ document.getElementById('enemyCharacter').value=enemy.appearance;
+}
+function startArcadeMatch(){
+ enemy.appearance=arcadeOpponents[arcadeMatchIndex];
+ selectedStage=stages[arcadeMatchIndex%stages.length].id;document.getElementById('stageSelect').value=selectedStage;
+ roundNumber=1;roundWins=[0,0];roundHistory=[];resetRound();setScreen('battle');canvas.focus?.();
+}
+function startArcadeRun(){
+ arcadeOpponents=arcadeOpponentIds(actor.appearance);arcadeMatchIndex=0;arcadeResults=[];startArcadeMatch();
+}
 const rosterColumns=3;
 const fighterNames={white:'メづすりν',blackcat:'黒猫',gray:'グレイ',mascot:'ようせい',green:'メづすりα',headset:'アネリア広報Bot',fish:'ダンクルオステウス'};
 let cursorSide='player';
-function selectSide(side){cursorSide=side;drawPortraits();}
-function chooseFighter(id){const c=cursorSide==='player'?actor:enemy;c.appearance=id;document.getElementById(cursorSide==='player'?'playerCharacter':'enemyCharacter').value=id;drawPortraits();}
+function selectSide(side){if(playMode==='arcade'&&side==='enemy')return;cursorSide=side;drawPortraits();}
+function chooseFighter(id){
+ const c=playMode==='arcade'||cursorSide==='player'?actor:enemy;
+ c.appearance=id;document.getElementById(c===actor?'playerCharacter':'enemyCharacter').value=id;
+ if(playMode==='arcade')syncArcadePreview();drawPortraits();
+}
 function moveSelectCursor(dx,dy){
  const c=cursorSide==='player'?actor:enemy,i=rosterIds.indexOf(c.appearance),rows=Math.ceil(rosterIds.length/rosterColumns);let next=i;
  if(dx){const start=Math.floor(i/rosterColumns)*rosterColumns,count=Math.min(rosterColumns,rosterIds.length-start);next=start+((i-start+dx+count)%count);}
@@ -328,8 +356,11 @@ function drawPortraits(){
 }
 document.getElementById('selectPlayer').onclick=()=>selectSide('player');
 document.getElementById('selectEnemy').onclick=()=>selectSide('enemy');
-for(const side of ['player','enemy'])for(const id of rosterIds){const b=document.getElementById((side==='player'?'':'enemy-')+'roster-'+id);b.onclick=()=>{cursorSide=side;chooseFighter(id);};b.addEventListener('focus',()=>selectSide(side));}
-function showCharacterSelect(){recordNotice='';stopRecording();resetRound();setScreen('select');cursorSide='player';drawPortraits();canvas.focus?.();}
+for(const side of ['player','enemy'])for(const id of rosterIds){const b=document.getElementById((side==='player'?'':'enemy-')+'roster-'+id);b.onclick=()=>{if(playMode==='arcade'&&side==='enemy')return;selectSide(side);chooseFighter(id);};b.addEventListener('focus',()=>selectSide(side));}
+function showCharacterSelect(mode='vs'){
+ recordNotice='';stopRecording();playMode=mode;arcadeResults=[];resetRound();cursorSide='player';
+ if(playMode==='arcade')syncArcadePreview();setScreen('select');drawPortraits();canvas.focus?.();
+}
 function showStageSelect(){setScreen('stage');canvas.focus?.();}
 document.getElementById('titleStart').onclick=showCharacterSelect;
 document.getElementById('selectBack').onclick=showTitle;
@@ -369,22 +400,23 @@ function menuButtons(){
   return buttons;
  }
  if(screen!=='select')return [];
- const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:'1 / PLAYER',selected:cursorSide==='player'},
- {id:'enemy',x:766,y:54,w:290,h:42,label:'2 / CPU',selected:cursorSide==='enemy'}];
+ const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:playMode==='arcade'?'ARCADE / PLAYER':'1 / PLAYER',selected:cursorSide==='player'},
+ {id:'enemy',x:766,y:54,w:290,h:42,label:playMode==='arcade'?'NEXT / CPU':'2 / CPU',selected:cursorSide==='enemy'}];
  for(const [i,id] of rosterIds.entries())buttons.push({id:'fighter:'+id,x:358+(i%rosterColumns)*132,y:40+Math.floor(i/rosterColumns)*104,w:120,h:94,fighter:id,side:cursorSide,selected:(cursorSide==='player'?actor:enemy).appearance===id,playerSelected:actor.appearance===id,cpuSelected:enemy.appearance===id});
  buttons.push({id:'back',x:44,y:427,w:170,h:54,label:'戻る / ESC'},
  {id:'record',x:226,y:427,w:124,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
- {id:'stage',x:766,y:427,w:290,h:54,label:'ステージ選択へ  /  ENTER',primary:true});
+ {id:playMode==='arcade'?'arcadeStart':'stage',x:766,y:427,w:290,h:54,label:playMode==='arcade'?'ARCADE START  /  ENTER':'ステージ選択へ  /  ENTER',primary:true});
  return buttons;
 }
 function activateMenu(id){
  if(!menuButtons().some(b=>b.id===id))return;
- if(id==='vs')showCharacterSelect();
- else if(id==='arcade')setScreen('arcade');
+ if(id==='vs')showCharacterSelect('vs');
+ else if(id==='arcade')showCharacterSelect('arcade');
  else if(id==='options')setScreen('options');
  else if(id==='title'||id==='back')showTitle();
  else if(id==='stageBack')showCharacterSelect();
  else if(id==='stage')showStageSelect();
+ else if(id==='arcadeStart')startArcadeRun();
  else if(id==='fight'){if(loaded)reset();}
  else if(id==='record'){startRecording();recordNotice=recordStatus.textContent;}
  else if(id.startsWith('difficulty:'))setDifficulty(id.slice(11));
@@ -428,18 +460,18 @@ function drawMenu(){
    menuPortrait(c.appearance,x,98,290,238,side==='enemy');
    menuText(fighterNames[c.appearance],x+145,349,20,side==='player'?UI.player:UI.cpu);
   }
-  menuText((cursorSide==='player'?'PLAYER':'CPU')+'を選択中',550,354,13,UI.gold);
+  menuText(playMode==='arcade'?'使用キャラクターを選択  /  CPUは3体連続で登場':(cursorSide==='player'?'PLAYER':'CPU')+'を選択中',550,354,13,UI.gold);
  }else if(screen==='result'){
-  const won=roundWins[0]===2;
-  menuText('MATCH RESULT',550,65,15,UI.gold);
-  menuText(won?'YOU WIN':'YOU LOSE',550,133,54,won?'#efc879':'#ebaaa3');
+  const won=roundWins[0]===2,arcade=playMode==='arcade';
+  menuText(arcade?'ARCADE RESULT':'MATCH RESULT',550,65,15,UI.gold);
+  menuText(arcade?(won?'ARCADE CLEAR':'ARCADE OVER'):(won?'YOU WIN':'YOU LOSE'),550,133,arcade?46:54,won?'#efc879':'#ebaaa3');
   menuPortrait(actor.appearance,70,145,300,240);menuPortrait(enemy.appearance,730,145,300,240,true);
   menuText(fighterNames[actor.appearance],220,401,20,UI.player);menuText(fighterNames[enemy.appearance],880,401,20,UI.cpu);
-  menuText(roundWins[0]+'  −  '+roundWins[1],550,212,48);
+  menuText(arcade?arcadeResults.filter(match=>match.won).length+' / 3':roundWins[0]+'  −  '+roundWins[1],550,212,48);
   // Draws can repeat indefinitely; show the most recent records and their total.
-  const history=roundHistory.slice(-4);
-  history.forEach((r,i)=>menuText('第'+r.round+'ラウンド  ·  '+(r.result==='DRAW'?'引き分け':r.result==='YOU WIN'?'PLAYER 勝利':'CPU 勝利'),550,267+i*29,17,UI.muted));
-  if(roundHistory.length>4)menuText('直近4戦 / 全'+roundHistory.length+'戦',550,397,13,UI.gold);
+  const history=arcade?arcadeResults.map((match,i)=>({round:i+1,result:match.won?'YOU WIN':'GAME OVER',opponent:match.opponent})):roundHistory.slice(-4);
+  history.forEach((r,i)=>menuText(arcade?'第'+r.round+'戦  ·  '+fighterNames[r.opponent]+'  '+(r.result==='YOU WIN'?'勝利':'敗北'):'第'+r.round+'ラウンド  ·  '+(r.result==='DRAW'?'引き分け':r.result==='YOU WIN'?'PLAYER 勝利':'CPU 勝利'),550,267+i*29,17,UI.muted));
+  if(!arcade&&roundHistory.length>4)menuText('直近4戦 / 全'+roundHistory.length+'戦',550,397,13,UI.gold);
  }
  for(const b of menuButtons()){
   const focused=menuFocus===b.id||menuHover===b.id;
@@ -456,7 +488,7 @@ function drawMenu(){
   }
   else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
  }
- const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応':screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
+ const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?(playMode==='arcade'?'矢印：キャラ　ARCADE STARTで3連戦を開始':'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応'):screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
  menuText(note,550,screen==='title'?480:screen==='select'?507:screen==='stage'?496:495,screen==='select'||screen==='stage'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
 }
 function menuHit(e){
@@ -500,7 +532,7 @@ window.addEventListener('keydown',e=>{
   if(k==='Enter'&&!e.repeat){
    e.preventDefault();
    if(screen==='title')activateMenu('vs');
-   else if(screen==='select')activateMenu('stage');
+   else if(screen==='select')activateMenu(playMode==='arcade'?'arcadeStart':'stage');
    else if(screen==='stage')activateMenu('fight');
    else if(['result','options','arcade'].includes(screen))showTitle();
   }
@@ -524,7 +556,7 @@ window.addEventListener('blur',()=>{keys.left=keys.right=keys.dash=keys.guard=fa
 document.querySelectorAll('[data-key]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);if(['damage','down'].includes(b.dataset.key))requestReaction(b.dataset.key);else if(b.dataset.key==='jump')requestJump();else if(attacks[b.dataset.key])requestAttack(b.dataset.key);else keys[b.dataset.key]=true;});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>{if(['left','right','dash','guard'].includes(b.dataset.key))keys[b.dataset.key]=false;});});
 Promise.all(['white_idle','white_guard','white_kick','white_punch','white_walk','white_jump','white_run','white_hurt','white_air_punch','white_down','white_air_kick','transform_white','beach','highway','restaurant','transform_blackcat','blackcat_air_kick','blackcat_air_punch','blackcat_down','blackcat_hurt','blackcat_jump','blackcat_guard','blackcat_kick','blackcat_punch','blackcat_run','blackcat_walk','blackcat_idle','gray_air_kick','gray_air_punch','transform_gray','gray_down','gray_hurt','gray_guard','gray_jump','gray_kick','gray_punch','gray_run','gray_walk','gray_idle','transform_headset','headset_air_kick','headset_air_punch','headset_down','headset_jump','headset_hurt','headset_guard','headset_punch','headset_kick','headset_run','headset_idle','headset_walk','transform_fish','fish_down','fish_air_kick','fish_air_punch','fish_kick','fish_jump','fish_guard','fish_bite','fish_hurt','fish_swim','transform_green','transform_mascot','library','idle','walk','jump','punch','kick','dash','damage','down','air_punch','air_kick','guard','green_idle','green_guard','green_kick','green_punch','green_walk','green_jump','green_run','green_hurt','green_air_punch','green_down','green_air_kick'].map(name=>new Promise((resolve,reject)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{sheets[name]=im;resolve();};im.onerror=()=>reject(new Error(name+'画像を読み込めませんでした'));im.src='assets/'+name+'.png';}))).then(()=>{loaded=true;document.getElementById("selectStatus").textContent="準備完了。キャラクターを選んで対戦開始。";drawPortraits();}).catch(e=>{assetError=e.message;document.querySelector('#error').textContent=e.message;document.getElementById('selectStatus').textContent=e.message+'。ページを開き直してください。';});
 setScreen('title');requestAnimationFrame(tick);
-window.motionTest={get selectedStage(){return selectedStage;},chooseStage,draw,menuButtons,activateMenu,transformationPose,advanceFrame,showTitle,get screen(){return screen;},get roundNumber(){return roundNumber;},get roundWins(){return [...roundWins];},get roundHistory(){return [...roundHistory];},get hitStop(){return hitStop;},showCharacterSelect,get selecting(){return selecting;},actor,enemy,enemyAI,setPaused,get paused(){return paused;},get remainingTime(){return remainingTime;},get countdown(){return countdown;},get result(){return result;},config,keys,update,reset,requestJump,requestAttack,requestReaction,attacks,CharacterState};
+window.motionTest={get selectedStage(){return selectedStage;},chooseStage,draw,menuButtons,activateMenu,transformationPose,advanceFrame,showTitle,get screen(){return screen;},get playMode(){return playMode;},get arcadeMatchIndex(){return arcadeMatchIndex;},get arcadeResults(){return [...arcadeResults];},get roundNumber(){return roundNumber;},get roundWins(){return [...roundWins];},get roundHistory(){return [...roundHistory];},get hitStop(){return hitStop;},showCharacterSelect,get selecting(){return selecting;},actor,enemy,enemyAI,setPaused,get paused(){return paused;},get remainingTime(){return remainingTime;},get countdown(){return countdown;},get result(){return result;},config,keys,update,reset,requestJump,requestAttack,requestReaction,attacks,CharacterState};
 
 if(document.modelContext?.registerTool){
  Promise.resolve(document.modelContext.registerTool({name:'configure_motion_test',description:'Adjust movement speed, jump height and gravity in the motion test.',inputSchema:{type:'object',properties:{speed:{type:'number',minimum:80,maximum:360},height:{type:'number',minimum:60,maximum:220},gravity:{type:'number',minimum:500,maximum:1800}},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object')throw new Error('Invalid settings');const ranges={speed:[80,360],height:[60,220],gravity:[500,1800]};for(const [key,value]of Object.entries(input)){if(!ranges[key]||typeof value!=='number'||!Number.isFinite(value)||value<ranges[key][0]||value>ranges[key][1])throw new Error('Invalid '+key);}for(const [key,value]of Object.entries(input)){config[key]=value;document.getElementById(key).value=value;document.getElementById(key+'Value').value=value;}return {...config};}})).catch(()=>{});
