@@ -20,3 +20,11 @@ main:not([data-screen=battle])>.stage{position:absolute;width:1px;height:1px;ove
 
 @media(max-width:600px) and (orientation:portrait){main>.touch{display:grid;grid-template-columns:repeat(12,minmax(0,1fr))}main>.touch button{grid-column:span 3;white-space:nowrap;min-height:48px}main>.touch button:nth-child(n+5){grid-column:span 4}}
 #howTo{order:6}#howTo p{color:var(--muted);font-size:14px}#howTo footer{margin-top:12px}
+/* The former on-screen fighting controls are intentionally removed from the PC UI. */
+main>.touch{display:none}
+
+/* ARSS Battle is a keyboard-first PC game. A mobile edition needs its own controls and layout. */
+@media(max-width:700px){
+ body::before{content:'ARSSバトルはPC専用です\A キーボードでの操作を前提にしています。';display:block;white-space:pre-line;min-height:100svh;padding:40svh 24px 0;background:var(--bg);color:var(--text);font:700 18px/1.8 var(--font);text-align:center}
+ body>main{display:none}
+}

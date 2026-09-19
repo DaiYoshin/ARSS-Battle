@@ -88,7 +88,6 @@ function startRecording(){
  }catch(e){recordingStream?.getTracks().forEach(track=>track.stop());recordButton.disabled=false;recordButton.textContent='録画して再戦';recordStatus.textContent=e.name==='SecurityError'||/tainted/i.test(e.message)?'画像の読み込み元により録画が制限されています。READMEの起動手順で開き直してください。':'録画を開始できませんでした：'+e.message;}
 }
 recordButton.onclick=startRecording;
-document.getElementById('mobileRecord').onclick=()=>{startRecording();document.getElementById('selectStatus').textContent=recordStatus.textContent;};
 function setPaused(value){
  if(result||selecting)return;
  paused=value;keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;
@@ -96,21 +95,11 @@ function setPaused(value){
  if(recorder){if(paused&&recorder.state==='recording')recorder.pause();else if(!paused&&recorder.state==='paused')recorder.resume();}
 }
 document.getElementById('pause').onclick=()=>setPaused(!paused);
-function syncMenuAccessibility(){
- if(!window.matchMedia)return;
- const portrait=window.matchMedia('(max-width:600px) and (orientation:portrait)').matches;
- for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']]){
-  for(const control of document.getElementById(id).querySelectorAll('button,select'))control.tabIndex=portrait&&screen===name?0:-1;
- }
- canvas.tabIndex=portrait&&selecting?-1:0;
- canvas.setAttribute('aria-hidden',String(portrait&&selecting));
-}
-window.addEventListener('resize',syncMenuAccessibility);
 function setScreen(next){
  screen=next;selecting=next!=='battle';last=0;menuFocus=null;menuHover=null;menuPointer=null;
  canvas.setAttribute?.('aria-label',({title:'ARSSバトル。Enterでスタート',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、QとEで難易度、ZとXでステージ、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ'})[next]);
  for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']])document.getElementById(id).hidden=next!==name;
- document.querySelector('main').setAttribute?.('data-screen',next);syncMenuAccessibility();
+ document.querySelector('main').setAttribute?.('data-screen',next);
  keys.left=keys.right=keys.dash=keys.guard=false;
 }
 function resetRound(){
