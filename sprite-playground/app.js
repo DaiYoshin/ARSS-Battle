@@ -406,7 +406,7 @@ function menuButtons(){
   for(const [i,id] of rosterIds.entries()){
    const row=Math.floor(i/columns),index=i%columns,count=Math.min(columns,rosterIds.length-row*columns);
    const x=550-(count*132-12)/2+index*132;
-   buttons.push({id:'fighter:'+id,x,y:136+row*112,w:120,h:96,fighter:id,side:'player',selected:actor.appearance===id,playerSelected:actor.appearance===id,cpuSelected:false});
+   buttons.push({id:'fighter:'+id,x,y:228+row*98,w:120,h:88,fighter:id,side:'player',selected:actor.appearance===id,playerSelected:actor.appearance===id,cpuSelected:false});
   }
   buttons.push({id:'back',x:110,y:427,w:210,h:54,label:'戻る / ESC'},
    {id:'record',x:340,y:427,w:170,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
@@ -469,9 +469,12 @@ function drawMenu(){
   menuText('対戦する舞台を選択',550,88,14,UI.muted);
  }else if(screen==='select'){
   if(playMode==='arcade'){
-   menuText('ARCADE MODE',550,54,18,UI.gold);
-   menuText('SELECT YOUR FIGHTER',550,84,28,UI.text);
-   menuText(fighterNames[actor.appearance],550,113,16,UI.player);
+   menuText('ARCADE MODE',550,48,18,UI.gold);
+   menuText('SELECT YOUR FIGHTER',550,76,24,UI.text);
+   ctx.fillStyle='#3b77752b';ctx.fillRect(440,88,220,118);
+   ctx.strokeStyle=UI.player;ctx.lineWidth=2;ctx.strokeRect(440,88,220,118);
+   menuPortrait(actor.appearance,445,82,210,122);
+   menuText('1P  /  '+fighterNames[actor.appearance],550,219,16,UI.player);
   }else{
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
@@ -498,7 +501,7 @@ function drawMenu(){
   ctx.fillStyle=b.primary?UI.gold:b.selected?UI.raised:UI.surface;ctx.fill();
   ctx.strokeStyle=focused?UI.text:b.selected?(b.side==='enemy'?UI.cpu:UI.player):UI.line;ctx.lineWidth=focused||b.selected?3:1;ctx.stroke();
   if(b.fighter){
-   if(loaded){const [sheet,x,y,w,h]=faceCrops[b.fighter];ctx.drawImage(sheets[sheet],x,y,w,h,b.x+(b.w-86)/2,b.y+4,86,86);}
+   if(loaded){const [sheet,x,y,w,h]=faceCrops[b.fighter],size=Math.min(86,b.w-8,b.h-8);ctx.drawImage(sheets[sheet],x,y,w,h,b.x+(b.w-size)/2,b.y+4,size,size);}
    for(const [marked,label,x,color] of [[b.playerSelected,'1P',b.x+4,UI.player],[b.cpuSelected,'CPU',b.x+b.w-48,UI.cpu]])if(marked){ctx.fillStyle='#091e20eb';ctx.fillRect(x,b.y+b.h-26,44,22);menuText(label,x+22,b.y+b.h-10,15,color);}
   }else if(b.stage){
    if(sheets[b.stage])ctx.drawImage(sheets[b.stage],0,0,sheets[b.stage].width,sheets[b.stage].height,b.x+4,b.y+4,b.w-8,b.h-35);
