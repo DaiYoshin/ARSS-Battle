@@ -318,10 +318,9 @@ function chooseFighter(id){
  if(playMode==='arcade')syncArcadePreview();drawPortraits();
 }
 function moveSelectCursor(dx,dy){
- const columns=playMode==='arcade'?4:rosterColumns;
- const c=cursorSide==='player'?actor:enemy,i=rosterIds.indexOf(c.appearance),rows=Math.ceil(rosterIds.length/columns);let next=i;
- if(dx){const start=Math.floor(i/columns)*columns,count=Math.min(columns,rosterIds.length-start);next=start+((i-start+dx+count)%count);}
- if(dy){let row=Math.floor(i/columns);do{row=(row+dy+rows)%rows;next=row*columns+i%columns;}while(next>=rosterIds.length);}
+ const c=cursorSide==='player'?actor:enemy,i=rosterIds.indexOf(c.appearance),rows=Math.ceil(rosterIds.length/rosterColumns);let next=i;
+ if(dx){const start=Math.floor(i/rosterColumns)*rosterColumns,count=Math.min(rosterColumns,rosterIds.length-start);next=start+((i-start+dx+count)%count);}
+ if(dy){let row=Math.floor(i/rosterColumns);do{row=(row+dy+rows)%rows;next=row*rosterColumns+i%rosterColumns;}while(next>=rosterIds.length);}
  chooseFighter(rosterIds[next]);
 }
 function paintPortrait(target,appearance,mirror=false){
@@ -402,15 +401,11 @@ function menuButtons(){
  }
  if(screen!=='select')return [];
  if(playMode==='arcade'){
-  const buttons=[],columns=4;
-  for(const [i,id] of rosterIds.entries()){
-   const row=Math.floor(i/columns),index=i%columns,count=Math.min(columns,rosterIds.length-row*columns);
-   const x=550-(count*132-12)/2+index*132;
-   buttons.push({id:'fighter:'+id,x,y:228+row*98,w:120,h:88,fighter:id,side:'player',selected:actor.appearance===id,playerSelected:actor.appearance===id,cpuSelected:false});
-  }
-  buttons.push({id:'back',x:110,y:427,w:210,h:54,label:'戻る / ESC'},
-   {id:'record',x:340,y:427,w:170,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
-   {id:'arcadeStart',x:730,y:427,w:260,h:54,label:'ARCADE START  /  ENTER',primary:true});
+  const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:'ARCADE / PLAYER',selected:true}];
+  for(const [i,id] of rosterIds.entries())buttons.push({id:'fighter:'+id,x:358+(i%rosterColumns)*132,y:40+Math.floor(i/rosterColumns)*104,w:120,h:94,fighter:id,side:'player',selected:actor.appearance===id,playerSelected:actor.appearance===id,cpuSelected:false});
+  buttons.push({id:'back',x:44,y:427,w:170,h:54,label:'戻る / ESC'},
+   {id:'record',x:226,y:427,w:124,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
+   {id:'arcadeStart',x:766,y:427,w:290,h:54,label:'ARCADE START  /  ENTER',primary:true});
   return buttons;
  }
  const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:playMode==='arcade'?'ARCADE / PLAYER':'1 / PLAYER',selected:cursorSide==='player'},
@@ -469,12 +464,10 @@ function drawMenu(){
   menuText('対戦する舞台を選択',550,88,14,UI.muted);
  }else if(screen==='select'){
   if(playMode==='arcade'){
-   menuText('ARCADE MODE',550,48,18,UI.gold);
-   menuText('SELECT YOUR FIGHTER',550,76,24,UI.text);
-   ctx.fillStyle='#3b77752b';ctx.fillRect(440,88,220,118);
-   ctx.strokeStyle=UI.player;ctx.lineWidth=2;ctx.strokeRect(440,88,220,118);
-   menuPortrait(actor.appearance,445,82,210,122);
-   menuText('1P  /  '+fighterNames[actor.appearance],550,219,16,UI.player);
+   ctx.fillStyle='#3b77752b';ctx.fillRect(44,106,290,244);
+   menuPortrait(actor.appearance,44,98,290,238);
+   menuText(fighterNames[actor.appearance],189,349,20,UI.player);
+   menuText('使用キャラクターを選択',550,354,13,UI.gold);
   }else{
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
