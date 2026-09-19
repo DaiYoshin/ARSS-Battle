@@ -1,4 +1,6 @@
 'use strict';
+// Shared visual vocabulary; keep the CSS :root palette in sync.
+const UI={bg:'#101c1d',surface:'#1b3031',raised:'#294344',line:'#63736b',text:'#f5eedf',muted:'#b9c7be',gold:'#e7c27f',player:'#87d8c9',cpu:'#f3a69b',font:'"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,system-ui,sans-serif'};
 const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
 const stateLabel=document.querySelector('#state'),keys={left:false,right:false,dash:false,guard:false};
 const actor=new Character(),enemy=new Character();
@@ -78,7 +80,7 @@ function startRecording(){
    const preview=document.getElementById('recordPreview');preview.src=recordingUrl;preview.hidden=false;
    recordDownload.download='match-'+new Date().toISOString().replace(/[:.]/g,'-')+(type.includes('mp4')?'.mp4':'.webm');
    recordDownload.hidden=false;recordButton.disabled=false;recordButton.textContent='録画して再戦';
-   recordStatus.textContent='録画完了。「動画を保存」からダウンロードできます。';recordNotice=recordStatus.textContent;
+   recordStatus.textContent='録画完了。「動画を保存」からダウンロードできます。';recordNotice=recordStatus.textContent;document.getElementById('selectStatus').textContent=recordStatus.textContent;
   };
   recorder.onerror=()=>{recordingFailed=true;recordStatus.textContent='録画中にエラーが発生しました。';if(recorder.state!=='inactive')stopRecording();else{recordingStream.getTracks().forEach(track=>track.stop());recordButton.disabled=false;recordButton.textContent='録画して再戦';}};
   recordButton.textContent='録画を停止';
@@ -86,6 +88,7 @@ function startRecording(){
  }catch(e){recordingStream?.getTracks().forEach(track=>track.stop());recordButton.disabled=false;recordButton.textContent='録画して再戦';recordStatus.textContent=e.name==='SecurityError'||/tainted/i.test(e.message)?'画像の読み込み元により録画が制限されています。READMEの起動手順で開き直してください。':'録画を開始できませんでした：'+e.message;}
 }
 recordButton.onclick=startRecording;
+document.getElementById('mobileRecord').onclick=()=>{startRecording();document.getElementById('selectStatus').textContent=recordStatus.textContent;};
 function setPaused(value){
  if(result||selecting)return;
  paused=value;keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;
@@ -93,11 +96,21 @@ function setPaused(value){
  if(recorder){if(paused&&recorder.state==='recording')recorder.pause();else if(!paused&&recorder.state==='paused')recorder.resume();}
 }
 document.getElementById('pause').onclick=()=>setPaused(!paused);
+function syncMenuAccessibility(){
+ if(!window.matchMedia)return;
+ const portrait=window.matchMedia('(max-width:600px) and (orientation:portrait)').matches;
+ for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']]){
+  for(const control of document.getElementById(id).querySelectorAll('button,select'))control.tabIndex=portrait&&screen===name?0:-1;
+ }
+ canvas.tabIndex=portrait&&selecting?-1:0;
+ canvas.setAttribute('aria-hidden',String(portrait&&selecting));
+}
+window.addEventListener('resize',syncMenuAccessibility);
 function setScreen(next){
  screen=next;selecting=next!=='battle';last=0;menuFocus=null;menuHover=null;menuPointer=null;
  canvas.setAttribute?.('aria-label',({title:'ARSSバトル。Enterでスタート',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、QとEで難易度、ZとXでステージ、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ'})[next]);
  for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']])document.getElementById(id).hidden=next!==name;
- document.querySelector('main').setAttribute?.('data-screen',next);
+ document.querySelector('main').setAttribute?.('data-screen',next);syncMenuAccessibility();
  keys.left=keys.right=keys.dash=keys.guard=false;
 }
 function resetRound(){
@@ -243,7 +256,7 @@ function drawCharacter(c,p){
 function countdownWord(){return ['SHOW','YOUR','C.V.C'][Math.max(0,Math.min(2,3-Math.ceil(countdown)))];}
 
 function drawRoundCallout(lines,size,y,lineHeight=0){
- ctx.save();ctx.fillStyle='#fff3dc';ctx.font='bold '+size+'px system-ui';ctx.textAlign='center';
+ ctx.save();ctx.fillStyle='#fff3dc';ctx.font='bold '+size+'px '+UI.font;ctx.textAlign='center';
  ctx.shadowColor='#000';ctx.shadowBlur=12;ctx.shadowOffsetY=3;
  lines.forEach((line,i)=>ctx.fillText(line,550,y+i*lineHeight));ctx.restore();
 }
@@ -253,19 +266,23 @@ function draw(p){
  ctx.clearRect(0,0,1100,520);
  if(sheets[selectedStage])ctx.drawImage(sheets[selectedStage],0,0,1100,520);
  else{ctx.fillStyle='#27312b';ctx.fillRect(0,0,1100,520);}
- ctx.fillStyle='#0c1819bb';ctx.fillRect(0,0,1100,130);
- ctx.fillStyle='#d2b575';ctx.font='12px system-ui';ctx.textAlign='center';ctx.fillText('ROUND '+roundNumber+' · '+currentStage().name,550,46);ctx.textAlign='left';
+ ctx.fillStyle='#101c1de8';ctx.fillRect(0,0,1100,102);
  if(loaded){ctx.imageSmoothingEnabled=false;drawCharacter(enemy,enemy.pose());drawCharacter(actor,p);}
- for(const [c,x,label,color] of [[actor,28,'PLAYER','#247f84'],[enemy,752,'ENEMY','#ad4c59']]){
-  ctx.fillStyle='#f3e7d2';ctx.font='bold 16px system-ui';ctx.fillText(fighterNames[c.appearance]+'  '+c.hp+' / '+c.maxHp,x,82);
-  ctx.fillStyle='#bac9cf';ctx.fillRect(x,94,320,14);ctx.fillStyle=color;ctx.fillRect(x,94,320*c.hp/c.maxHp,14);
-  ctx.fillStyle='#bac9cf';ctx.fillRect(x,113,320,5);ctx.fillStyle='#c2933c';ctx.fillRect(x,113,320*c.guardMeter/100,5);
-  ctx.textAlign='center';ctx.fillStyle=color;ctx.fillText(label,c.x,490);ctx.fillStyle='#edc879';ctx.fillText('●'.repeat(roundWins[c===actor?0:1])+'○'.repeat(2-roundWins[c===actor?0:1]),x+160,58);ctx.textAlign='left';
+ for(const [c,x,label,color] of [[actor,28,'1P',UI.player],[enemy,662,'CPU',UI.cpu]]){
+  const right=c===enemy;
+  menuText(label+'  '+fighterNames[c.appearance],right?1072:x,31,20,UI.text,right?'right':'left');
+  ctx.fillStyle=UI.raised;ctx.fillRect(x,44,410,20);
+  ctx.fillStyle=color;const hpWidth=410*Math.max(0,c.hp)/c.maxHp;
+  ctx.fillRect(right?x+410-hpWidth:x,44,hpWidth,20);
+  ctx.fillStyle=UI.raised;ctx.fillRect(x,71,410,5);ctx.fillStyle=UI.gold;
+  const guardWidth=410*Math.max(0,c.guardMeter)/100;ctx.fillRect(right?x+410-guardWidth:x,71,guardWidth,5);
+  menuText('●'.repeat(roundWins[right?1:0])+'○'.repeat(2-roundWins[right?1:0]),right?1072:x,95,18,UI.gold,right?'right':'left');
  }
- ctx.fillStyle='#f3e7d2';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText(String(Math.ceil(remainingTime)).padStart(2,'0'),550,100);ctx.textAlign='left';
+ menuText('ROUND '+roundNumber,550,29,15,UI.gold);
+ menuText(String(Math.ceil(remainingTime)).padStart(2,'0'),550,73,42,UI.text);
  for(const e of effects){
   ctx.save();ctx.translate(e.x,e.y);ctx.globalAlpha=Math.min(1,e.life*8);ctx.strokeStyle=e.blocked?'#8de7f0':'#fff5a3';ctx.lineWidth=4;
-  ctx.font='bold 16px system-ui';ctx.fillStyle=e.blocked?'#9fe9e7':'#ffe3a1';ctx.textAlign='center';ctx.fillText(e.blocked?'GUARD':'HIT',0,-35);ctx.textAlign='left';
+  ctx.font='bold 16px '+UI.font;ctx.fillStyle=e.blocked?'#9fe9e7':'#ffe3a1';ctx.textAlign='center';ctx.fillText(e.blocked?'GUARD':'HIT',0,-35);ctx.textAlign='left';
   const radius=12+(1-e.life/.24)*28;
   if(e.blocked){ctx.beginPath();ctx.arc(0,0,radius,0,Math.PI*2);ctx.stroke();}
   else for(let i=0;i<8;i++){const a=i*Math.PI/4;ctx.beginPath();ctx.moveTo(Math.cos(a)*8,Math.sin(a)*8);ctx.lineTo(Math.cos(a)*radius,Math.sin(a)*radius);ctx.stroke();}
@@ -273,7 +290,7 @@ function draw(p){
  }
  if(countdown>0&&!selecting)drawRoundCallout([countdownWord()],76,280);
  else if(fightCueTime>0&&!result)drawRoundCallout(['FIGHT!'],76,280);
- if(paused){ctx.fillStyle='#101a29cc';ctx.fillRect(360,155,380,100);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px system-ui';ctx.fillText('PAUSED',550,198);ctx.font='16px system-ui';ctx.fillText('Esc または再開ボタン',550,232);ctx.textAlign='left';}
+ if(paused){ctx.fillStyle='#101a29cc';ctx.fillRect(360,155,380,100);ctx.fillStyle='#fff';ctx.textAlign='center';ctx.font='bold 32px '+UI.font;ctx.fillText('PAUSED',550,198);ctx.font='16px '+UI.font;ctx.fillText('Esc または再開ボタン',550,232);ctx.textAlign='left';}
  if(result)drawRoundCallout(['FINISH!'],64,218);
 
 }
@@ -362,8 +379,8 @@ function activateMenu(id){
  else if(id.startsWith('stage:'))chooseStage(id.slice(6));
  else if(id.startsWith('fighter:'))chooseFighter(id.slice(8));
 }
-function menuText(text,x,y,size=20,color='#f3e7d2',align='center'){
- ctx.fillStyle=color;ctx.font='600 '+size+'px system-ui';ctx.textAlign=align;ctx.fillText(text,x,y);
+function menuText(text,x,y,size=20,color=UI.text,align='center'){
+ ctx.fillStyle=color;ctx.font='600 '+size+'px '+UI.font;ctx.textAlign=align;ctx.fillText(text,x,y);
 }
 function menuPortrait(id,x,y,w=300,h=260,mirror=false){
  if(!loaded)return;
@@ -376,41 +393,44 @@ function drawMenu(){
  ctx.clearRect(0,0,1100,520);ctx.imageSmoothingEnabled=false;
  if(sheets[selectedStage])ctx.drawImage(sheets[selectedStage],0,0,1100,520);
  else{ctx.fillStyle='#172b2e';ctx.fillRect(0,0,1100,520);}
- ctx.fillStyle='#081718d9';ctx.fillRect(0,0,1100,520);
- ctx.strokeStyle='#9e8151';ctx.lineWidth=1;ctx.strokeRect(18,18,1064,484);
+ ctx.fillStyle='#101c1de8';ctx.fillRect(0,0,1100,520);
+ ctx.strokeStyle=UI.line;ctx.lineWidth=1;ctx.strokeRect(18,18,1064,484);
  if(screen==='title'){
-  menuText('ARSSバトル',550,220,64);
+  menuText('7 FIGHTERS  /  4 STAGES',550,135,16,UI.gold);
+  menuText('ARSSバトル',550,228,76);
+  menuText('キャラクターを選んで、いざ対戦。',550,272,20,UI.muted);
  }else if(screen==='select'){
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
    menuPortrait(c.appearance,x,98,290,238,side==='enemy');
-   menuText(fighterNames[c.appearance],x+145,349,20,side==='player'?'#9ce3dc':'#ffc0b5');
+   menuText(fighterNames[c.appearance],x+145,349,20,side==='player'?UI.player:UI.cpu);
   }
-  menuText((cursorSide==='player'?'PLAYER':'CPU')+'を選択中',550,354,13,'#d7b477');
+  menuText((cursorSide==='player'?'PLAYER':'CPU')+'を選択中',550,354,13,UI.gold);
  }else if(screen==='result'){
   const won=roundWins[0]===2;
-  menuText('MATCH RESULT',550,65,15,'#d7b477');
+  menuText('MATCH RESULT',550,65,15,UI.gold);
   menuText(won?'YOU WIN':'YOU LOSE',550,133,54,won?'#efc879':'#ebaaa3');
-  menuPortrait(actor.appearance,70,145,300,265);menuPortrait(enemy.appearance,730,145,300,265,true);
-  menuText(fighterNames[actor.appearance],220,401,20,'#9ce3dc');menuText(fighterNames[enemy.appearance],880,401,20,'#ffc0b5');
+  menuPortrait(actor.appearance,70,145,300,240);menuPortrait(enemy.appearance,730,145,300,240,true);
+  menuText(fighterNames[actor.appearance],220,401,20,UI.player);menuText(fighterNames[enemy.appearance],880,401,20,UI.cpu);
   menuText(roundWins[0]+'  −  '+roundWins[1],550,212,48);
   // Draws can repeat indefinitely; show the most recent records and their total.
   const history=roundHistory.slice(-4);
-  history.forEach((r,i)=>menuText('第'+r.round+'ラウンド  ·  '+(r.result==='DRAW'?'引き分け':r.result==='YOU WIN'?'PLAYER 勝利':'CPU 勝利'),550,267+i*29,17,'#ced6c9'));
-  if(roundHistory.length>4)menuText('直近4戦 / 全'+roundHistory.length+'戦',550,397,13,'#d7b477');
+  history.forEach((r,i)=>menuText('第'+r.round+'ラウンド  ·  '+(r.result==='DRAW'?'引き分け':r.result==='YOU WIN'?'PLAYER 勝利':'CPU 勝利'),550,267+i*29,17,UI.muted));
+  if(roundHistory.length>4)menuText('直近4戦 / 全'+roundHistory.length+'戦',550,397,13,UI.gold);
  }
  for(const b of menuButtons()){
   const focused=menuFocus===b.id||menuHover===b.id;
-  ctx.fillStyle=b.primary?'#e2bb78':b.selected?'#3c645f':'#1b3437';ctx.fillRect(b.x,b.y,b.w,b.h);
-  ctx.strokeStyle=focused?'#ffffff':b.selected?(b.side==='enemy'?'#ffa99f':'#8ee1d7'):'#8b7956';ctx.lineWidth=focused||b.selected?3:1;ctx.strokeRect(b.x,b.y,b.w,b.h);
+  ctx.beginPath();ctx.roundRect(b.x,b.y,b.w,b.h,8);
+  ctx.fillStyle=b.primary?UI.gold:b.selected?UI.raised:UI.surface;ctx.fill();
+  ctx.strokeStyle=focused?UI.text:b.selected?(b.side==='enemy'?UI.cpu:UI.player):UI.line;ctx.lineWidth=focused||b.selected?3:1;ctx.stroke();
   if(b.fighter){
    if(loaded){const [sheet,x,y,w,h]=faceCrops[b.fighter];ctx.drawImage(sheets[sheet],x,y,w,h,b.x+(b.w-86)/2,b.y+4,86,86);}
-   for(const [marked,label,x,color] of [[b.playerSelected,'1P',b.x+4,'#9ce3dc'],[b.cpuSelected,'CPU',b.x+b.w-48,'#ffc0b5']])if(marked){ctx.fillStyle='#091e20eb';ctx.fillRect(x,b.y+b.h-26,44,22);menuText(label,x+22,b.y+b.h-10,15,color);}
+   for(const [marked,label,x,color] of [[b.playerSelected,'1P',b.x+4,UI.player],[b.cpuSelected,'CPU',b.x+b.w-48,UI.cpu]])if(marked){ctx.fillStyle='#091e20eb';ctx.fillRect(x,b.y+b.h-26,44,22);menuText(label,x+22,b.y+b.h-10,15,color);}
   }else if(b.stage){if(sheets[b.stage])ctx.drawImage(sheets[b.stage],0,0,sheets[b.stage].width,sheets[b.stage].height,b.x+5,b.y+5,64,38);menuText(b.label,b.x+155,b.y+30,16);}
-  else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?'#172b2e':'#f3e7d2');
+  else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
  }
  const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?'矢印：キャラ　1 / 2：操作側　Q / E：難易度　Z / X：ステージ　クリック・タップ対応':'クリック・タップ・Enterで進む';
- menuText(note,550,screen==='title'?414:507,screen==='select'?13:15,assetError?'#ffb7ad':'#c7cdbb');ctx.textAlign='left';
+ menuText(note,550,screen==='title'?414:507,screen==='select'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
 }
 function menuHit(e){
  const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return null;

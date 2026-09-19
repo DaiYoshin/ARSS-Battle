@@ -20,10 +20,26 @@ const root=path.resolve(__dirname,'..'),output=path.join(root,'../.qa-canvas');
   await page.goto(standalone?'file://'+path.join(root,'../sprite-playground.html'):'http://127.0.0.1:'+server.address().port+'/');
   await page.waitForFunction(()=>document.getElementById('selectStatus').textContent.startsWith('準備完了'));
   const state=()=>page.evaluate(()=>window.motionTest.screen);
-  const click=async id=>{const b=await page.evaluate(id=>window.motionTest.menuButtons().find(b=>b.id===id),id);assert(b,id);const rect=await page.locator('#game').boundingBox();const pointer=page.viewportSize().width===390?page.touchscreen:page.mouse;await pointer[page.viewportSize().width===390?'tap':'click'](rect.x+(b.x+b.w/2)*rect.width/1100,rect.y+(b.y+b.h/2)*rect.height/520);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));};
+  const click=async id=>{
+   if(page.viewportSize().width===390 && await state()==='select'){
+    const ids={player:'selectPlayer',enemy:'selectEnemy',fight:'startMatch',back:'selectBack',record:'mobileRecord'};
+    if(id.startsWith('stage:'))await page.locator('#stageSelect').selectOption(id.slice(6));
+    else if(id.startsWith('fighter:'))await page.locator('#enemy-roster-'+id.slice(8)).tap();
+    else if(ids[id])await page.locator('#'+ids[id]).tap();
+    else throw new Error('Unmapped portrait action: '+id);
+    return;
+   }
+   const b=await page.evaluate(id=>window.motionTest.menuButtons().find(b=>b.id===id),id);assert(b,id);const rect=await page.locator('#game').boundingBox();const pointer=page.viewportSize().width===390?page.touchscreen:page.mouse;await pointer[page.viewportSize().width===390?'tap':'click'](rect.x+(b.x+b.w/2)*rect.width/1100,rect.y+(b.y+b.h/2)*rect.height/520);await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));};
   assert(await page.locator('#game').isVisible());assert.equal(await state(),'title');
   await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'title.png')});
   await click('start');assert.equal(await state(),'select');
+  for(const width of [320,375,390,600]){
+   await page.setViewportSize({width,height:850});
+   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'no portrait horizontal overflow at '+width);
+   const box=await page.locator('#roster-green').boundingBox();assert(box.width>=44&&box.height>=44,'touch target at '+width);
+   await page.waitForFunction(()=>document.getElementById('startMatch').tabIndex===0);
+  }
+  await page.setViewportSize({width:1200,height:820});
   assert.equal(await page.evaluate(()=>motionTest.menuButtons().filter(b=>b.fighter).length),7);
   await click('fighter:blackcat');await click('enemy');await click('fighter:blackcat');assert(await page.evaluate(()=>{const b=motionTest.menuButtons().find(b=>b.fighter==='blackcat');return b.playerSelected&&b.cpuSelected;}));await click('fighter:gray');await click('difficulty');
   assert.deepEqual(await page.evaluate(()=>[motionTest.actor.appearance,motionTest.enemy.appearance,motionTest.enemyAI.difficulty]),['blackcat','gray','hard']);
@@ -60,12 +76,24 @@ const root=path.resolve(__dirname,'..'),output=path.join(root,'../.qa-canvas');
    await page.evaluate(()=>motionTest.showCharacterSelect());assert.equal(await page.evaluate(()=>motionTest.selectedStage),stage);
   }
   await page.keyboard.press('x');assert.equal(await page.evaluate(()=>motionTest.selectedStage),'beach');await page.keyboard.press('z');assert.equal(await page.evaluate(()=>motionTest.selectedStage),'library');
-  // Same hitboxes at a narrow viewport; touch uses the same PointerEvent path.
+  // Portrait menus use full-size DOM controls; battle stays on the recording canvas.
   await page.setViewportSize({width:390,height:760});await click('stage:highway');assert.equal(await page.evaluate(()=>motionTest.selectedStage),'highway');await click('enemy');await click('fighter:white');assert.equal(await page.evaluate(()=>motionTest.enemy.appearance),'white');
-  await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'mobile.png')});
+  assert(await page.locator('#characterSelect').isVisible());
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  const touchBox=await page.locator('#enemy-roster-white').boundingBox();assert(touchBox.width>=44&&touchBox.height>=44);
+  await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'mobile.png'),fullPage:true});
   await click('fight');assert.equal(await state(),'battle');assert(await page.locator('#game').isVisible());
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'mobile-battle.png'),fullPage:true});
+  await page.setViewportSize({width:844,height:390});
+  const battleBox=await page.locator('#game').boundingBox(),controlBox=await page.locator('main>.touch').boundingBox();
+  assert(battleBox.width>600);assert(controlBox.y+controlBox.height<=390,'landscape battle and controls fit');
+  await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'landscape-battle.png')});
+  await page.setViewportSize({width:390,height:760});
   await page.evaluate(()=>{const t=motionTest;t.enemyAI.cooldown=1000;for(let i=0;i<2;i++){t.advanceFrame(3);t.enemy.knockDown();t.advanceFrame(0);t.advanceFrame(4);}});
-  assert.equal(await state(),'result');assert.equal(await page.evaluate(()=>motionTest.selectedStage),'highway');assert(await page.locator('#game').isVisible());
+  assert.equal(await state(),'result');
+  await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'mobile-result.png'),fullPage:true});
+  assert.equal(await page.evaluate(()=>motionTest.selectedStage),'highway');assert(await page.locator('#game').isVisible());
   await page.setViewportSize({width:1200,height:820});await page.screenshot({path:path.join(output,(standalone?'standalone-':'source-')+'result.png')});
   await click('title');assert.equal(await state(),'title');
   // Cancelled pointer must never activate a button.
