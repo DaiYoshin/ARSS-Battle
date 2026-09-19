@@ -97,7 +97,7 @@ function setPaused(value){
 document.getElementById('pause').onclick=()=>setPaused(!paused);
 function setScreen(next){
  screen=next;selecting=next!=='battle';last=0;menuFocus=null;menuHover=null;menuPointer=null;
- canvas.setAttribute?.('aria-label',({title:'ARSSバトル。Enterでスタート',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、QとEで難易度、ZとXでステージ、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ'})[next]);
+ canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。VS MODE、ARCADE MODE、OPTIONSから選択',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、ZとXでステージ、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。CPUの強さを選択',arcade:'アーケードモード。準備中'})[next]);
  for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']])document.getElementById(id).hidden=next!==name;
  document.querySelector('main').setAttribute?.('data-screen',next);
  keys.left=keys.right=keys.dash=keys.guard=false;
@@ -339,13 +339,27 @@ document.getElementById('chooseCharacter').onclick=showCharacterSelect;
 // All visible menu screens are rendered into the battle canvas.
 const difficultyIds=['easy','normal','hard'];
 const difficultyLabels={easy:'やさしい',normal:'ふつう',hard:'つよい'};
+function setDifficulty(id){
+ if(!difficultyIds.includes(id))return;
+ enemyAI.difficulty=id;document.getElementById('difficulty').value=id;
+}
 function changeDifficulty(direction){
- const i=difficultyIds.indexOf(enemyAI.difficulty);enemyAI.difficulty=difficultyIds[(i+direction+3)%3];
- document.getElementById('difficulty').value=enemyAI.difficulty;
+ const i=difficultyIds.indexOf(enemyAI.difficulty);setDifficulty(difficultyIds[(i+direction+3)%3]);
 }
 function menuButtons(){
- if(screen==='title')return [{id:'start',x:400,y:314,w:300,h:58,label:'スタート  /  ENTER',primary:true}];
+ if(screen==='title')return [
+  {id:'vs',x:385,y:274,w:330,h:52,label:'VS MODE',primary:true},
+  {id:'arcade',x:385,y:336,w:330,h:52,label:'ARCADE MODE'},
+  {id:'options',x:385,y:398,w:330,h:52,label:'OPTIONS'}
+ ];
  if(screen==='result')return [{id:'title',x:425,y:427,w:250,h:54,label:'タイトルへ  /  ENTER',primary:true}];
+ if(screen==='arcade')return [{id:'title',x:425,y:420,w:250,h:54,label:'タイトルへ  /  ESC'}];
+ if(screen==='options')return [
+  {id:'difficulty:easy',x:218,y:235,w:200,h:58,label:'EASY',selected:enemyAI.difficulty==='easy'},
+  {id:'difficulty:normal',x:450,y:235,w:200,h:58,label:'NORMAL',selected:enemyAI.difficulty==='normal',primary:enemyAI.difficulty==='normal'},
+  {id:'difficulty:hard',x:682,y:235,w:200,h:58,label:'HARD',selected:enemyAI.difficulty==='hard'},
+  {id:'title',x:425,y:420,w:250,h:54,label:'タイトルへ  /  ESC'}
+ ];
  if(screen!=='select')return [];
  const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:'1 / PLAYER',selected:cursorSide==='player'},
  {id:'enemy',x:766,y:54,w:290,h:42,label:'2 / CPU',selected:cursorSide==='enemy'}];
@@ -353,17 +367,18 @@ function menuButtons(){
  for(const [i,stage] of stages.entries())buttons.push({id:'stage:'+stage.id,x:44+i*256,y:365,w:244,h:48,stage:stage.id,label:stage.name,selected:selectedStage===stage.id});
  buttons.push({id:'back',x:44,y:427,w:170,h:54,label:'戻る / ESC'},
  {id:'record',x:226,y:427,w:124,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
- {id:'difficulty',x:362,y:427,w:300,h:54,label:'難易度：'+difficultyLabels[enemyAI.difficulty]+'  ›'},
  {id:'fight',x:766,y:427,w:290,h:54,label:'対戦開始 / ENTER',primary:true});
  return buttons;
 }
 function activateMenu(id){
  if(!menuButtons().some(b=>b.id===id))return;
- if(id==='start')showCharacterSelect();
+ if(id==='vs')showCharacterSelect();
+ else if(id==='arcade')setScreen('arcade');
+ else if(id==='options')setScreen('options');
  else if(id==='title'||id==='back')showTitle();
  else if(id==='fight'){if(loaded)reset();}
  else if(id==='record'){startRecording();recordNotice=recordStatus.textContent;}
- else if(id==='difficulty')changeDifficulty(1);
+ else if(id.startsWith('difficulty:'))setDifficulty(id.slice(11));
  else if(id==='player'||id==='enemy')selectSide(id);
  else if(id.startsWith('stage:'))chooseStage(id.slice(6));
  else if(id.startsWith('fighter:'))chooseFighter(id.slice(8));
@@ -385,9 +400,16 @@ function drawMenu(){
  ctx.fillStyle='#101c1de8';ctx.fillRect(0,0,1100,520);
  ctx.strokeStyle=UI.line;ctx.lineWidth=1;ctx.strokeRect(18,18,1064,484);
  if(screen==='title'){
-  menuText('7 FIGHTERS  /  4 STAGES',550,135,16,UI.gold);
-  menuText('ARSSバトル',550,228,76);
-  menuText('キャラクターを選んで、いざ対戦。',550,272,20,UI.muted);
+  menuText('ARSS BATTLE',550,198,68,UI.text);
+  menuText('PC FIGHTING GAME',550,226,12,UI.gold);
+ }else if(screen==='arcade'){
+  menuText('ARCADE MODE',550,168,48,UI.text);
+  menuText('連戦モードは準備中です。',550,240,20,UI.muted);
+  menuText('VS MODE でCPU戦を遊べます。',550,274,15,UI.gold);
+ }else if(screen==='options'){
+  menuText('OPTIONS',550,132,46,UI.text);
+  menuText('CPU DIFFICULTY',550,194,15,UI.gold);
+  menuText('CPUの強さを選択',550,326,16,UI.muted);
  }else if(screen==='select'){
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
@@ -418,8 +440,8 @@ function drawMenu(){
   }else if(b.stage){if(sheets[b.stage])ctx.drawImage(sheets[b.stage],0,0,sheets[b.stage].width,sheets[b.stage].height,b.x+5,b.y+5,64,38);menuText(b.label,b.x+155,b.y+30,16);}
   else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
  }
- const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?'矢印：キャラ　1 / 2：操作側　Q / E：難易度　Z / X：ステージ　クリック・タップ対応':'クリック・タップ・Enterで進む';
- menuText(note,550,screen==='title'?414:507,screen==='select'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
+ const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?'矢印：キャラ　1 / 2：操作側　Z / X：ステージ　クリックまたはキーボード対応':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
+ menuText(note,550,screen==='title'?480:screen==='select'?507:495,screen==='select'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
 }
 function menuHit(e){
  const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return null;
@@ -435,7 +457,7 @@ canvas.addEventListener('pointerleave',()=>{menuHover=null;});
 function tick(t){const dt=last?Math.min((t-last)/1000,.033):0;last=t;draw(advanceFrame(dt));requestAnimationFrame(tick);}
 for(const name of ['speed','height','gravity'])document.getElementById(name).addEventListener('input',e=>{config[name]=Number(e.target.value);document.getElementById(name+'Value').value=config[name];});
 document.getElementById('reset').onclick=reset;
-window.addEventListener('keydown',e=>{const k=e.code;if(e.target===canvas&&['ArrowUp','ArrowDown','Space'].includes(k))e.preventDefault();if(k==='Escape'&&!e.repeat){e.preventDefault();if(screen==='select'||screen==='result')showTitle();else setPaused(!paused);return;}if(e.target.matches('input,textarea,select'))return;if(selecting&&e.target.matches('button')&&['Enter','Space'].includes(k))return;if(selecting){if(k==='Tab'&&e.target===canvas){e.preventDefault();const buttons=menuButtons(),i=buttons.findIndex(b=>b.id===menuFocus);menuFocus=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.id;return;}if((k==='Enter'||k==='Space')&&!e.repeat&&menuFocus){e.preventDefault();activateMenu(menuFocus);return;}if(screen==='select'){if((k==='KeyZ'||k==='KeyX')&&!e.repeat){e.preventDefault();cycleStage(k==='KeyZ'?-1:1);return;}if((k==='KeyQ'||k==='KeyE')&&!e.repeat){e.preventDefault();changeDifficulty(k==='KeyQ'?-1:1);return;}const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};if(moves[k]){e.preventDefault();menuFocus=null;moveSelectCursor(...moves[k]);return;}if(k==='Digit1'||k==='Digit2'){e.preventDefault();menuFocus=null;selectSide(k==='Digit1'?'player':'enemy');return;}}if(k==='Enter'&&!e.repeat){e.preventDefault();if(screen==='title')showCharacterSelect();else if(screen==='select')activateMenu('fight');else if(screen==='result')showTitle();}return;}if(k==='KeyR'&&!e.repeat){reset();return;}if(paused)return;if(['ArrowLeft','ArrowRight','Space','ArrowUp','ArrowDown','KeyA','KeyS','KeyH','KeyL','KeyR','KeyD'].includes(k))e.preventDefault();if(k==='ShiftLeft'||k==='ShiftRight')keys.dash=true;if(k==='ArrowLeft')keys.left=true;if(k==='ArrowRight')keys.right=true;if((k==='Space'||k==='ArrowUp')&&!e.repeat)requestJump();if(k==='KeyD')keys.guard=true;if(k==='KeyA'&&!e.repeat)requestAttack('punch');if(k==='KeyS'&&!e.repeat)requestAttack('kick');if(k==='KeyH'&&!e.repeat&&document.getElementById('debug').open)requestReaction('damage');if(k==='KeyL'&&!e.repeat&&document.getElementById('debug').open)requestReaction('down');if(k==='KeyR'&&!e.repeat)reset();});
+window.addEventListener('keydown',e=>{const k=e.code;if(e.target===canvas&&['ArrowUp','ArrowDown','Space'].includes(k))e.preventDefault();if(k==='Escape'&&!e.repeat){e.preventDefault();if(['select','result','options','arcade'].includes(screen))showTitle();else setPaused(!paused);return;}if(e.target.matches('input,textarea,select'))return;if(selecting&&e.target.matches('button')&&['Enter','Space'].includes(k))return;if(selecting){if(k==='Tab'&&e.target===canvas){e.preventDefault();const buttons=menuButtons(),i=buttons.findIndex(b=>b.id===menuFocus);menuFocus=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.id;return;}if((k==='Enter'||k==='Space')&&!e.repeat&&menuFocus){e.preventDefault();activateMenu(menuFocus);return;}if(screen==='select'){if((k==='KeyZ'||k==='KeyX')&&!e.repeat){e.preventDefault();cycleStage(k==='KeyZ'?-1:1);return;}const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};if(moves[k]){e.preventDefault();menuFocus=null;moveSelectCursor(...moves[k]);return;}if(k==='Digit1'||k==='Digit2'){e.preventDefault();menuFocus=null;selectSide(k==='Digit1'?'player':'enemy');return;}}if(k==='Enter'&&!e.repeat){e.preventDefault();if(screen==='title')activateMenu('vs');else if(screen==='select')activateMenu('fight');else if(['result','options','arcade'].includes(screen))showTitle();}return;}if(k==='KeyR'&&!e.repeat){reset();return;}if(paused)return;if(['ArrowLeft','ArrowRight','Space','ArrowUp','ArrowDown','KeyA','KeyS','KeyH','KeyL','KeyR','KeyD'].includes(k))e.preventDefault();if(k==='ShiftLeft'||k==='ShiftRight')keys.dash=true;if(k==='ArrowLeft')keys.left=true;if(k==='ArrowRight')keys.right=true;if((k==='Space'||k==='ArrowUp')&&!e.repeat)requestJump();if(k==='KeyD')keys.guard=true;if(k==='KeyA'&&!e.repeat)requestAttack('punch');if(k==='KeyS'&&!e.repeat)requestAttack('kick');if(k==='KeyH'&&!e.repeat&&document.getElementById('debug').open)requestReaction('damage');if(k==='KeyL'&&!e.repeat&&document.getElementById('debug').open)requestReaction('down');if(k==='KeyR'&&!e.repeat)reset();});
 window.addEventListener('keyup',e=>{if(e.code==='KeyD')keys.guard=false;if(['ShiftLeft','ShiftRight'].includes(e.code))keys.dash=false;if(e.code==='ArrowLeft')keys.left=false;if(e.code==='ArrowRight')keys.right=false;});
 window.addEventListener('blur',()=>{keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;if(!result)setPaused(true);});
 document.querySelectorAll('[data-key]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);if(['damage','down'].includes(b.dataset.key))requestReaction(b.dataset.key);else if(b.dataset.key==='jump')requestJump();else if(attacks[b.dataset.key])requestAttack(b.dataset.key);else keys[b.dataset.key]=true;});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>{if(['left','right','dash','guard'].includes(b.dataset.key))keys[b.dataset.key]=false;});});
