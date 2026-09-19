@@ -16,15 +16,15 @@ const root=path.resolve(__dirname,'..');
  assert.equal(get('marker-headset').textContent,'1P');assert.equal(get('enemy-marker-blackcat').textContent,'CPU');
  const portraitOps=[];get('enemyPortrait').getContext=()=>({clearRect(){},save(){},restore(){},translate(x,y){portraitOps.push(['translate',x,y]);},scale(x,y){portraitOps.push(['scale',x,y]);},drawImage(){}});
  get('selectPlayer').onclick();assert(portraitOps.some(op=>op[0]==='scale'&&op[1]===-1&&op[2]===1));
- get('roster-gray').onclick();assert.equal(t.actor.appearance,'gray');assert.equal(get('playerName').textContent,'グレイ');key('ArrowDown');assert.equal(t.actor.appearance,'fish');key('ArrowUp');assert.equal(t.actor.appearance,'gray');key('ArrowRight');assert.equal(t.actor.appearance,'mascot');key('ArrowDown');assert.equal(t.actor.appearance,'blackcat');assert.equal(get('playerName').textContent,'黒猫');get('enemy-roster-blackcat').onclick();assert.equal(t.enemy.appearance,'blackcat');get('startMatch').onclick();assert.equal(t.actor.appearance,'blackcat');assert.equal(t.enemy.appearance,'blackcat');t.showCharacterSelect();get('roster-gray').onclick();
- get('enemy-roster-gray').onclick();assert.equal(t.enemy.appearance,'gray');get('startMatch').onclick();assert.equal(t.screen,'battle');assert.equal(t.actor.appearance,'gray');t.showCharacterSelect();
+ get('roster-gray').onclick();assert.equal(t.actor.appearance,'gray');assert.equal(get('playerName').textContent,'グレイ');key('ArrowDown');assert.equal(t.actor.appearance,'fish');key('ArrowUp');assert.equal(t.actor.appearance,'gray');key('ArrowRight');assert.equal(t.actor.appearance,'mascot');key('ArrowDown');assert.equal(t.actor.appearance,'blackcat');assert.equal(get('playerName').textContent,'黒猫');get('enemy-roster-blackcat').onclick();assert.equal(t.enemy.appearance,'blackcat');t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.actor.appearance,'blackcat');assert.equal(t.enemy.appearance,'blackcat');t.showCharacterSelect();get('roster-gray').onclick();
+ get('enemy-roster-gray').onclick();assert.equal(t.enemy.appearance,'gray');t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.screen,'battle');assert.equal(t.actor.appearance,'gray');t.showCharacterSelect();
  get('selectPlayer').onclick();get('roster-white').onclick();assert.equal(t.actor.appearance,'white');assert.equal(get('playerName').textContent,'メづすりν');
  key('ArrowRight');assert.equal(t.actor.appearance,'white','single-cell row wraps safely');
  key('ArrowUp');assert.equal(t.actor.appearance,'blackcat');key('ArrowDown');assert.equal(t.actor.appearance,'white');
- get('enemy-roster-white').onclick();get('startMatch').onclick();assert.equal(t.actor.appearance,'white');assert.equal(t.enemy.appearance,'white');t.showCharacterSelect();
+ get('enemy-roster-white').onclick();t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.actor.appearance,'white');assert.equal(t.enemy.appearance,'white');t.showCharacterSelect();
  console.log('PASS: cursor selection keyboard/click, independent sides, shared choice and opponent portrait mirror');
  get('playerCharacter').change({target:{value:'mascot'}});get('enemyCharacter').change({target:{value:'green'}});get('difficulty').change({target:{value:'hard'}});
- get('startMatch').onclick();assert.equal(t.screen,'battle');assert.equal(t.actor.appearance,'mascot');assert.equal(t.enemy.appearance,'green');assert.equal(t.enemyAI.difficulty,'hard');
+ t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.screen,'battle');assert.equal(t.actor.appearance,'mascot');assert.equal(t.enemy.appearance,'green');assert.equal(t.enemyAI.difficulty,'hard');
  function endRound(winner){t.advanceFrame(3);t.enemyAI.cooldown=1000;if(winner==='player')t.enemy.knockDown();else if(winner==='cpu')t.actor.knockDown();else{t.actor.knockDown();t.enemy.knockDown();}t.advanceFrame(0);}
  for(const sequence of [['player','player'],['cpu','cpu'],['player','cpu','player'],['cpu','player','cpu']]){
   t.reset();get('record').onclick();assert.equal(tracks.at(-1).stopped,false);
@@ -62,7 +62,7 @@ const root=path.resolve(__dirname,'..');
 
  for(const winnerAppearance of ['mascot','blackcat']){t.reset();t.actor.appearance=winnerAppearance;t.enemy.appearance='blackcat';endRound('player');t.advanceFrame(4);endRound('player');assert.equal(t.transformationPose(t.enemy),null,'blackcat normal KO against other winners');}
  t.reset();t.actor.appearance='green';t.enemy.appearance='blackcat';endRound('player');t.advanceFrame(4);endRound('draw');assert.equal(t.transformationPose(t.enemy),null);t.advanceFrame(4);t.advanceFrame(3);t.actor.hp=80;t.enemy.hp=50;t.enemyAI.cooldown=1000;t.enemy.x=1000;t.advanceFrame(90);assert.equal(t.transformationPose(t.enemy),null,'blackcat timeout stays normal');
- t.showTitle();get('titleStart').onclick();get('playerCharacter').change({target:{value:'fish'}});get('startMatch').onclick();assert.equal(t.actor.appearance,'fish');
+ t.showTitle();get('titleStart').onclick();get('playerCharacter').change({target:{value:'fish'}});t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.actor.appearance,'fish');
  for(const [state,rate] of [['idle',8],['walk',12],['dash',21.6]]){t.actor.enter(state);t.actor.stateTime=1;assert.equal(t.actor.pose().animation,'fish_swim');assert.equal(t.actor.pose().frame,Math.floor(rate)%36);t.actor.stateTime=36/rate;assert.equal(t.actor.pose().frame,0);}
  console.log('PASS: transformation only on alpha final KO; nu normal victory, both sides and appearances, full playback/hold/reset, no first-round/draw/timeout/mascot activation');
  console.log('PASS: '+(standalone?'standalone':'source')+' title/select/battle/result/title, 2-0/2-1 both winners, draws, timeout, reset and continuous match recording');

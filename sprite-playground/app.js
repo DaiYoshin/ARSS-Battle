@@ -9,7 +9,7 @@ actor.appearance='green';enemy.appearance='mascot';
 const stages=[{id:'library',name:'図書館',subtitle:'THE QUIET LIBRARY'},{id:'beach',name:'海辺',subtitle:'SUNSET BEACH'},{id:'highway',name:'近未来都市ハイウェイ',subtitle:'NEON HIGHWAY'},{id:'restaurant',name:'レストラン',subtitle:'RESTAURANT'}];
 let selectedStage='library';
 function currentStage(){return stages.find(s=>s.id===selectedStage)||stages[0];}
-function chooseStage(id){if(screen!=='select'||!stages.some(s=>s.id===id))return;selectedStage=id;document.getElementById('stageSelect').value=id;}
+function chooseStage(id){if(!['select','stage'].includes(screen)||!stages.some(s=>s.id===id))return;selectedStage=id;document.getElementById('stageSelect').value=id;}
 function cycleStage(direction){chooseStage(stages[(stages.findIndex(s=>s.id===selectedStage)+direction+stages.length)%stages.length].id);}
 document.getElementById('stageSelect').addEventListener('change',e=>chooseStage(e.target.value));
 for(const [id,c] of [['playerCharacter',actor],['enemyCharacter',enemy]])document.getElementById(id).addEventListener('change',e=>{c.appearance=e.target.value;drawPortraits();});
@@ -97,7 +97,7 @@ function setPaused(value){
 document.getElementById('pause').onclick=()=>setPaused(!paused);
 function setScreen(next){
  screen=next;selecting=next!=='battle';last=0;menuFocus=null;menuHover=null;menuPointer=null;
- canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。VS MODE、ARCADE MODE、OPTIONSから選択',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、ZとXでステージ、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。CPUの強さを選択',arcade:'アーケードモード。準備中'})[next]);
+ canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。VS MODE、ARCADE MODE、OPTIONSから選択',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、Enterでステージ選択へ進む',stage:'ステージ選択。ZとXでステージを切替、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。CPUの強さを選択',arcade:'アーケードモード。準備中'})[next]);
  for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']])document.getElementById(id).hidden=next!==name;
  document.querySelector('main').setAttribute?.('data-screen',next);
  keys.left=keys.right=keys.dash=keys.guard=false;
@@ -107,7 +107,7 @@ function resetRound(){
  result=null;roundEndTime=0;countdown=3;fightCueTime=0;remainingTime=90;paused=false;
  document.getElementById('pause').textContent='一時停止 (Esc)';keys.left=keys.right=keys.dash=keys.guard=false;
 }
-function reset(){if(!(screen==='select'&&recordFromSelect&&recorder?.state==='recording'))stopRecording();roundNumber=1;roundWins=[0,0];roundHistory=[];resetRound();setScreen('battle');canvas.focus?.();}
+function reset(){if(!(['select','stage'].includes(screen)&&recordFromSelect&&recorder?.state==='recording'))stopRecording();roundNumber=1;roundWins=[0,0];roundHistory=[];resetRound();setScreen('battle');canvas.focus?.();}
 function showTitle(){stopRecording();resetRound();roundNumber=1;roundWins=[0,0];roundHistory=[];setScreen('title');canvas.focus?.();}
 function finishRound(){
  fightCueTime=0;
@@ -330,6 +330,7 @@ document.getElementById('selectPlayer').onclick=()=>selectSide('player');
 document.getElementById('selectEnemy').onclick=()=>selectSide('enemy');
 for(const side of ['player','enemy'])for(const id of rosterIds){const b=document.getElementById((side==='player'?'':'enemy-')+'roster-'+id);b.onclick=()=>{cursorSide=side;chooseFighter(id);};b.addEventListener('focus',()=>selectSide(side));}
 function showCharacterSelect(){recordNotice='';stopRecording();resetRound();setScreen('select');cursorSide='player';drawPortraits();canvas.focus?.();}
+function showStageSelect(){setScreen('stage');canvas.focus?.();}
 document.getElementById('titleStart').onclick=showCharacterSelect;
 document.getElementById('selectBack').onclick=showTitle;
 document.getElementById('resultTitle').onclick=showTitle;
@@ -360,14 +361,20 @@ function menuButtons(){
   {id:'difficulty:hard',x:682,y:235,w:200,h:58,label:'HARD',selected:enemyAI.difficulty==='hard'},
   {id:'title',x:425,y:420,w:250,h:54,label:'タイトルへ  /  ESC'}
  ];
+ if(screen==='stage'){
+  const buttons=[];
+  for(const [i,stage] of stages.entries())buttons.push({id:'stage:'+stage.id,x:55+(i%2)*505,y:108+Math.floor(i/2)*148,w:485,h:128,stage:stage.id,label:stage.name,selected:selectedStage===stage.id});
+  buttons.push({id:'stageBack',x:55,y:416,w:215,h:54,label:'キャラ選択へ  /  ESC'},
+   {id:'fight',x:760,y:416,w:285,h:54,label:'対戦開始  /  ENTER',primary:true});
+  return buttons;
+ }
  if(screen!=='select')return [];
  const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:'1 / PLAYER',selected:cursorSide==='player'},
  {id:'enemy',x:766,y:54,w:290,h:42,label:'2 / CPU',selected:cursorSide==='enemy'}];
  for(const [i,id] of rosterIds.entries())buttons.push({id:'fighter:'+id,x:358+(i%rosterColumns)*132,y:40+Math.floor(i/rosterColumns)*104,w:120,h:94,fighter:id,side:cursorSide,selected:(cursorSide==='player'?actor:enemy).appearance===id,playerSelected:actor.appearance===id,cpuSelected:enemy.appearance===id});
- for(const [i,stage] of stages.entries())buttons.push({id:'stage:'+stage.id,x:44+i*256,y:365,w:244,h:48,stage:stage.id,label:stage.name,selected:selectedStage===stage.id});
  buttons.push({id:'back',x:44,y:427,w:170,h:54,label:'戻る / ESC'},
  {id:'record',x:226,y:427,w:124,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
- {id:'fight',x:766,y:427,w:290,h:54,label:'対戦開始 / ENTER',primary:true});
+ {id:'stage',x:766,y:427,w:290,h:54,label:'ステージ選択へ  /  ENTER',primary:true});
  return buttons;
 }
 function activateMenu(id){
@@ -376,6 +383,8 @@ function activateMenu(id){
  else if(id==='arcade')setScreen('arcade');
  else if(id==='options')setScreen('options');
  else if(id==='title'||id==='back')showTitle();
+ else if(id==='stageBack')showCharacterSelect();
+ else if(id==='stage')showStageSelect();
  else if(id==='fight'){if(loaded)reset();}
  else if(id==='record'){startRecording();recordNotice=recordStatus.textContent;}
  else if(id.startsWith('difficulty:'))setDifficulty(id.slice(11));
@@ -410,6 +419,9 @@ function drawMenu(){
   menuText('OPTIONS',550,132,46,UI.text);
   menuText('CPU DIFFICULTY',550,194,15,UI.gold);
   menuText('CPUの強さを選択',550,326,16,UI.muted);
+ }else if(screen==='stage'){
+  menuText('SELECT STAGE',550,62,28,UI.gold);
+  menuText('対戦する舞台を選択',550,88,14,UI.muted);
  }else if(screen==='select'){
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
@@ -437,11 +449,15 @@ function drawMenu(){
   if(b.fighter){
    if(loaded){const [sheet,x,y,w,h]=faceCrops[b.fighter];ctx.drawImage(sheets[sheet],x,y,w,h,b.x+(b.w-86)/2,b.y+4,86,86);}
    for(const [marked,label,x,color] of [[b.playerSelected,'1P',b.x+4,UI.player],[b.cpuSelected,'CPU',b.x+b.w-48,UI.cpu]])if(marked){ctx.fillStyle='#091e20eb';ctx.fillRect(x,b.y+b.h-26,44,22);menuText(label,x+22,b.y+b.h-10,15,color);}
-  }else if(b.stage){if(sheets[b.stage])ctx.drawImage(sheets[b.stage],0,0,sheets[b.stage].width,sheets[b.stage].height,b.x+5,b.y+5,64,38);menuText(b.label,b.x+155,b.y+30,16);}
+  }else if(b.stage){
+   if(sheets[b.stage])ctx.drawImage(sheets[b.stage],0,0,sheets[b.stage].width,sheets[b.stage].height,b.x+4,b.y+4,b.w-8,b.h-35);
+   ctx.fillStyle='#101c1de0';ctx.fillRect(b.x+2,b.y+b.h-31,b.w-4,29);
+   menuText(b.label,b.x+b.w/2,b.y+b.h-10,16,b.selected?UI.gold:UI.text);
+  }
   else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
  }
- const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?'矢印：キャラ　1 / 2：操作側　Z / X：ステージ　クリックまたはキーボード対応':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
- menuText(note,550,screen==='title'?480:screen==='select'?507:495,screen==='select'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
+ const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応':screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
+ menuText(note,550,screen==='title'?480:screen==='select'?507:screen==='stage'?496:495,screen==='select'||screen==='stage'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
 }
 function menuHit(e){
  const r=canvas.getBoundingClientRect();if(!r.width||!r.height)return null;
@@ -457,7 +473,52 @@ canvas.addEventListener('pointerleave',()=>{menuHover=null;});
 function tick(t){const dt=last?Math.min((t-last)/1000,.033):0;last=t;draw(advanceFrame(dt));requestAnimationFrame(tick);}
 for(const name of ['speed','height','gravity'])document.getElementById(name).addEventListener('input',e=>{config[name]=Number(e.target.value);document.getElementById(name+'Value').value=config[name];});
 document.getElementById('reset').onclick=reset;
-window.addEventListener('keydown',e=>{const k=e.code;if(e.target===canvas&&['ArrowUp','ArrowDown','Space'].includes(k))e.preventDefault();if(k==='Escape'&&!e.repeat){e.preventDefault();if(['select','result','options','arcade'].includes(screen))showTitle();else setPaused(!paused);return;}if(e.target.matches('input,textarea,select'))return;if(selecting&&e.target.matches('button')&&['Enter','Space'].includes(k))return;if(selecting){if(k==='Tab'&&e.target===canvas){e.preventDefault();const buttons=menuButtons(),i=buttons.findIndex(b=>b.id===menuFocus);menuFocus=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.id;return;}if((k==='Enter'||k==='Space')&&!e.repeat&&menuFocus){e.preventDefault();activateMenu(menuFocus);return;}if(screen==='select'){if((k==='KeyZ'||k==='KeyX')&&!e.repeat){e.preventDefault();cycleStage(k==='KeyZ'?-1:1);return;}const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};if(moves[k]){e.preventDefault();menuFocus=null;moveSelectCursor(...moves[k]);return;}if(k==='Digit1'||k==='Digit2'){e.preventDefault();menuFocus=null;selectSide(k==='Digit1'?'player':'enemy');return;}}if(k==='Enter'&&!e.repeat){e.preventDefault();if(screen==='title')activateMenu('vs');else if(screen==='select')activateMenu('fight');else if(['result','options','arcade'].includes(screen))showTitle();}return;}if(k==='KeyR'&&!e.repeat){reset();return;}if(paused)return;if(['ArrowLeft','ArrowRight','Space','ArrowUp','ArrowDown','KeyA','KeyS','KeyH','KeyL','KeyR','KeyD'].includes(k))e.preventDefault();if(k==='ShiftLeft'||k==='ShiftRight')keys.dash=true;if(k==='ArrowLeft')keys.left=true;if(k==='ArrowRight')keys.right=true;if((k==='Space'||k==='ArrowUp')&&!e.repeat)requestJump();if(k==='KeyD')keys.guard=true;if(k==='KeyA'&&!e.repeat)requestAttack('punch');if(k==='KeyS'&&!e.repeat)requestAttack('kick');if(k==='KeyH'&&!e.repeat&&document.getElementById('debug').open)requestReaction('damage');if(k==='KeyL'&&!e.repeat&&document.getElementById('debug').open)requestReaction('down');if(k==='KeyR'&&!e.repeat)reset();});
+window.addEventListener('keydown',e=>{
+ const k=e.code;
+ if(e.target===canvas&&['ArrowUp','ArrowDown','Space'].includes(k))e.preventDefault();
+ if(k==='Escape'&&!e.repeat){
+  e.preventDefault();
+  if(screen==='stage')showCharacterSelect();
+  else if(['select','result','options','arcade'].includes(screen))showTitle();
+  else setPaused(!paused);
+  return;
+ }
+ if(e.target.matches('input,textarea,select'))return;
+ if(selecting&&e.target.matches('button')&&['Enter','Space'].includes(k))return;
+ if(selecting){
+  if(k==='Tab'&&e.target===canvas){
+   e.preventDefault();const buttons=menuButtons(),i=buttons.findIndex(b=>b.id===menuFocus);
+   menuFocus=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.id;return;
+  }
+  if((k==='Enter'||k==='Space')&&!e.repeat&&menuFocus){e.preventDefault();activateMenu(menuFocus);return;}
+  if(screen==='select'){
+   const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
+   if(moves[k]){e.preventDefault();menuFocus=null;moveSelectCursor(...moves[k]);return;}
+   if(k==='Digit1'||k==='Digit2'){e.preventDefault();menuFocus=null;selectSide(k==='Digit1'?'player':'enemy');return;}
+  }
+  if(screen==='stage'&&(k==='KeyZ'||k==='KeyX')&&!e.repeat){e.preventDefault();cycleStage(k==='KeyZ'?-1:1);return;}
+  if(k==='Enter'&&!e.repeat){
+   e.preventDefault();
+   if(screen==='title')activateMenu('vs');
+   else if(screen==='select')activateMenu('stage');
+   else if(screen==='stage')activateMenu('fight');
+   else if(['result','options','arcade'].includes(screen))showTitle();
+  }
+  return;
+ }
+ if(k==='KeyR'&&!e.repeat){reset();return;}
+ if(paused)return;
+ if(['ArrowLeft','ArrowRight','Space','ArrowUp','ArrowDown','KeyA','KeyS','KeyH','KeyL','KeyR','KeyD'].includes(k))e.preventDefault();
+ if(k==='ShiftLeft'||k==='ShiftRight')keys.dash=true;
+ if(k==='ArrowLeft')keys.left=true;if(k==='ArrowRight')keys.right=true;
+ if((k==='Space'||k==='ArrowUp')&&!e.repeat)requestJump();
+ if(k==='KeyD')keys.guard=true;
+ if(k==='KeyA'&&!e.repeat)requestAttack('punch');
+ if(k==='KeyS'&&!e.repeat)requestAttack('kick');
+ if(k==='KeyH'&&!e.repeat&&document.getElementById('debug').open)requestReaction('damage');
+ if(k==='KeyL'&&!e.repeat&&document.getElementById('debug').open)requestReaction('down');
+ if(k==='KeyR'&&!e.repeat)reset();
+});
 window.addEventListener('keyup',e=>{if(e.code==='KeyD')keys.guard=false;if(['ShiftLeft','ShiftRight'].includes(e.code))keys.dash=false;if(e.code==='ArrowLeft')keys.left=false;if(e.code==='ArrowRight')keys.right=false;});
 window.addEventListener('blur',()=>{keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;if(!result)setPaused(true);});
 document.querySelectorAll('[data-key]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);if(['damage','down'].includes(b.dataset.key))requestReaction(b.dataset.key);else if(b.dataset.key==='jump')requestJump();else if(attacks[b.dataset.key])requestAttack(b.dataset.key);else keys[b.dataset.key]=true;});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>{if(['left','right','dash','guard'].includes(b.dataset.key))keys[b.dataset.key]=false;});});

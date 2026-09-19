@@ -22,7 +22,7 @@ vm.createContext(c);for(const f of ['character.js','app.js'])vm.runInContext(fs.
  failStart=true;button.onclick();assert(tracks.at(-1).stopped);assert.equal(button.disabled,false);assert(get('recordStatus').textContent.includes('開始できません'));
 
  failStart=false;t.showCharacterSelect();t.activateMenu('record');r=instances.at(-1);assert.equal(r.state,'recording');assert.equal(t.screen,'select');const selectedRecording=r;
- t.activateMenu('fight');assert.equal(t.screen,'battle');assert.equal(r.state,'recording');assert.equal(instances.at(-1),selectedRecording);
+ t.activateMenu('stage');assert.equal(t.screen,'stage');t.activateMenu('fight');assert.equal(t.screen,'battle');assert.equal(r.state,'recording');assert.equal(instances.at(-1),selectedRecording);
  for(let i=0;i<2;i++){t.advanceFrame(3);t.enemyAI.cooldown=1000;t.enemy.knockDown();t.advanceFrame(0);t.advanceFrame(4);}
  assert.equal(t.screen,'result');assert.equal(r.state,'recording');t.advanceFrame(1.99);assert.equal(r.state,'recording');t.advanceFrame(.02);assert.equal(r.state,'inactive');r.finish();assert(tracks.at(-1).stopped);
  console.log('PASS: selection recording remains continuous through battle and includes two seconds of results');
