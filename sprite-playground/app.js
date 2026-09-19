@@ -401,11 +401,11 @@ function menuButtons(){
  }
  if(screen!=='select')return [];
  if(playMode==='arcade'){
-  const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:'ARCADE / PLAYER',selected:true}];
-  for(const [i,id] of rosterIds.entries())buttons.push({id:'fighter:'+id,x:358+(i%rosterColumns)*132,y:40+Math.floor(i/rosterColumns)*104,w:120,h:94,fighter:id,side:'player',selected:actor.appearance===id,playerSelected:actor.appearance===id,cpuSelected:false});
-  buttons.push({id:'back',x:44,y:427,w:170,h:54,label:'戻る / ESC'},
-   {id:'record',x:226,y:427,w:124,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
-   {id:'arcadeStart',x:766,y:427,w:290,h:54,label:'ARCADE START  /  ENTER',primary:true});
+  const buttons=[{id:'player',x:200,y:54,w:290,h:42,label:'ARCADE / PLAYER',selected:true}];
+  for(const [i,id] of rosterIds.entries())buttons.push({id:'fighter:'+id,x:514+(i%rosterColumns)*132,y:40+Math.floor(i/rosterColumns)*104,w:120,h:94,fighter:id,side:'player',selected:actor.appearance===id,playerSelected:actor.appearance===id,cpuSelected:false});
+  buttons.push({id:'back',x:200,y:427,w:170,h:54,label:'戻る / ESC'},
+   {id:'record',x:382,y:427,w:124,h:54,label:recordButton.disabled?'保存中…':recorder&&recorder.state!=='inactive'?'■ 停止':'● 録画'},
+   {id:'arcadeStart',x:610,y:427,w:290,h:54,label:'ARCADE START  /  ENTER',primary:true});
   return buttons;
  }
  const buttons=[{id:'player',x:44,y:54,w:290,h:42,label:playMode==='arcade'?'ARCADE / PLAYER':'1 / PLAYER',selected:cursorSide==='player'},
@@ -464,9 +464,9 @@ function drawMenu(){
   menuText('対戦する舞台を選択',550,88,14,UI.muted);
  }else if(screen==='select'){
   if(playMode==='arcade'){
-   ctx.fillStyle='#3b77752b';ctx.fillRect(44,106,290,244);
-   menuPortrait(actor.appearance,44,98,290,238);
-   menuText(fighterNames[actor.appearance],189,349,20,UI.player);
+   ctx.fillStyle='#3b77752b';ctx.fillRect(200,106,290,244);
+   menuPortrait(actor.appearance,200,98,290,238);
+   menuText(fighterNames[actor.appearance],345,349,20,UI.player);
    menuText('使用キャラクターを選択',550,354,13,UI.gold);
   }else{
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
