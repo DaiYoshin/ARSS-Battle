@@ -23,6 +23,20 @@ const root=path.resolve(__dirname,'..');
  key('ArrowUp');assert.equal(t.actor.appearance,'blackcat');key('ArrowDown');assert.equal(t.actor.appearance,'white');
  get('enemy-roster-white').onclick();t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.actor.appearance,'white');assert.equal(t.enemy.appearance,'white');t.showCharacterSelect();
  console.log('PASS: cursor selection keyboard/click, independent sides, shared choice and opponent portrait mirror');
+ t.showCharacterSelect('arcade');t.activateMenu('arcadeStart');
+ for(let match=0;match<4;match++){
+  assert.equal(t.arcadeMatchIndex,match);
+  assert.equal(t.enemy.appearance==='commander',match===3);
+  for(let round=0;round<2;round++){
+   assert.equal(t.enemy.hp,match===3?150:100);
+   t.advanceFrame(3);t.enemyAI.cooldown=1000;t.enemy.knockDown();t.advanceFrame(0);t.advanceFrame(4);
+  }
+ }
+ assert.equal(t.screen,'result');assert.equal(get('matchOutcome').textContent,'ARCADE CLEAR');
+ assert.equal(t.arcadeResults[3].opponent,'commander');
+ t.showTitle();t.showCharacterSelect('vs');assert.notEqual(t.enemy.appearance,'commander');
+ console.log('PASS: final commander boss, round health reset, arcade clear and VS return');
+
  get('playerCharacter').change({target:{value:'mascot'}});get('enemyCharacter').change({target:{value:'green'}});get('difficulty').change({target:{value:'hard'}});
  t.activateMenu('stage');t.activateMenu('fight');assert.equal(t.screen,'battle');assert.equal(t.actor.appearance,'mascot');assert.equal(t.enemy.appearance,'green');assert.equal(t.enemyAI.difficulty,'hard');
  function endRound(winner){t.advanceFrame(3);t.enemyAI.cooldown=1000;if(winner==='player')t.enemy.knockDown();else if(winner==='cpu')t.actor.knockDown();else{t.actor.knockDown();t.enemy.knockDown();}t.advanceFrame(0);}
@@ -39,7 +53,7 @@ const root=path.resolve(__dirname,'..');
  t.advanceFrame(3);t.actor.hp=80;t.enemy.hp=50;t.enemyAI.cooldown=1000;t.enemy.x=1000;t.advanceFrame(90);assert.equal(t.result,'YOU WIN');assert.deepEqual(Array.from(t.roundWins),[1,0]);t.advanceFrame(4);assert.equal(t.roundNumber,2);
  t.showTitle();handlers.keydown({code:'KeyR',repeat:false,target:{matches:()=>false},preventDefault(){}});assert.equal(t.screen,'title');
 
- for(const winnerAppearance of ['green','white'])for(const winnerSide of ['player','cpu'])for(const loserAppearance of ['mascot','green','white','fish','headset','gray','blackcat']){
+ for(const winnerAppearance of ['green','white'])for(const winnerSide of ['player','cpu'])for(const loserAppearance of ['mascot','green','white','fish','headset','gray','blackcat','commander']){
   t.reset();const winner=winnerSide==='player'?t.actor:t.enemy,loser=winnerSide==='player'?t.enemy:t.actor;
   winner.appearance=winnerAppearance;loser.appearance=loserAppearance;
   endRound(winnerSide);assert.equal(t.transformationPose(loser),null,'first point uses normal KO');t.advanceFrame(4);

@@ -1,0 +1,2 @@
+Built-in image_gen edit. Reference: user supplied 写真1.jpg.
+Prompt: Edit target: attached soldier game character. Remove only the magenta background, replace with genuinely transparent alpha background. Preserve exactly the olive uniform, beret, sunglasses, knife, boots, full body right-facing pose and pixel-art style. Single full-body character with modest transparent padding, no text, no shadow, no additional objects. This is the Waka Empire commander arcade boss game sprite.

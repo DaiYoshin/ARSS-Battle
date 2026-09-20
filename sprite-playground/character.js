@@ -32,15 +32,23 @@ const GRAY_PUNCH={frames:Array.from({length:17},(_,i)=>i),fps:30,damage:15,hitbo
 const GRAY_KICK={frames:Array.from({length:17},(_,i)=>i),fps:30,damage:22,hitboxes:{5:[236,49,265,91],6:[236,49,265,91],7:[236,49,265,91],8:[236,49,265,91],9:[236,49,265,91]}};
 const GRAY_AIR_PUNCH={frames:Array.from({length:14},(_,i)=>i),fps:30,air:true,damage:15,hitboxes:{4:[232,162,258,186],5:[211,206,235,231],6:[198,218,222,242],7:[198,218,222,242]}};
 const GRAY_AIR_KICK={frames:Array.from({length:15},(_,i)=>i),fps:30,air:true,damage:22,hitboxes:{5:[237,136,268,175],6:[237,136,263,175],7:[237,136,263,175],8:[237,136,263,175],9:[237,136,263,175]}};
+const COMMANDER_ATTACKS=Object.fromEntries(['punch','kick','air_punch','air_kick'].map(name=>[name,{
+ frames:Array.from({length:18},(_,i)=>i),fps:30,damage:name.includes('kick')?25:19,air:name.startsWith('air_'),
+ hitboxes:Object.fromEntries([6,7,8,9].map(i=>[i,name.includes('kick')?[206,120,288,180]:[208,90,292,148]]))
+}]));
+COMMANDER_ATTACKS.punch={frames:Array.from({length:18},(_,i)=>i),fps:30,damage:19,hitboxes:Object.fromEntries([6,7,8,9,10].map(i=>[i,[232,68,264,104]]))};
+COMMANDER_ATTACKS.kick={frames:Array.from({length:22},(_,i)=>i),fps:30,damage:25,hitboxes:{8:[250,68,279,102],9:[265,48,291,83],...Object.fromEntries([10,11,12,13,14].map(i=>[i,[266,40,293,76]]))}};
+COMMANDER_ATTACKS.air_kick={frames:Array.from({length:16},(_,i)=>i),fps:30,air:true,damage:25,hitboxes:Object.fromEntries([6,7,8,9,10,11].map(i=>[i,[222,160,262,195]]))};
+COMMANDER_ATTACKS.air_punch={frames:Array.from({length:18},(_,i)=>i),fps:30,air:true,damage:19,hitboxes:{9:[213,25,249,63],10:[219,65,262,100],11:[210,97,250,133],12:[210,109,244,145],13:[210,109,244,145]}};
 class Character {
  constructor(settings={speed:180,height:140,gravity:1000}){this.settings={...settings};this.reset();}
- reset(){Object.assign(this,{x:550,y:0,vx:0,vy:0,facing:1,grounded:true,state:CharacterState.IDLE,stateTime:0,idleTime:0,jumpTime:0,jumpImpulse:0,jumpBuffer:0,gameOver:false,hp:100,maxHp:100,guardMeter:100,guardDelay:0,airAttackUsed:false,attackConnected:false,blockTime:0});}
+ reset(){Object.assign(this,{x:550,y:0,vx:0,vy:0,facing:1,grounded:true,state:CharacterState.IDLE,stateTime:0,idleTime:0,jumpTime:0,jumpImpulse:0,jumpBuffer:0,gameOver:false,hp:this.appearance==='commander'?150:100,maxHp:this.appearance==='commander'?150:100,guardMeter:100,guardDelay:0,airAttackUsed:false,attackConnected:false,blockTime:0});}
  get controllable(){return !this.gameOver&&['idle','walk','dash','jump','land'].includes(this.state);}
  // White is a palette variant: combat rules always come from green.
  get baseAppearance(){return this.appearance==='white'?'green':this.appearance;}
  get renderOffsetY(){return this.baseAppearance==='green'?15:0;}
- get renderScale(){return this.appearance==='headset'?1.1:this.appearance==='fish'?1.5:this.baseAppearance==='green'?1.15:1;}
- get attackData(){return this.appearance==='blackcat'&&this.state==='air_kick'?BLACKCAT_AIR_KICK:this.appearance==='blackcat'&&this.state==='air_punch'?BLACKCAT_AIR_PUNCH:this.appearance==='blackcat'&&this.state==='kick'?BLACKCAT_KICK:this.appearance==='blackcat'&&this.state==='punch'?BLACKCAT_PUNCH:this.appearance==='gray'&&this.state==='air_kick'?GRAY_AIR_KICK:this.appearance==='gray'&&this.state==='air_punch'?GRAY_AIR_PUNCH:this.appearance==='gray'&&this.state==='kick'?GRAY_KICK:this.appearance==='gray'&&this.state==='punch'?GRAY_PUNCH:this.appearance==='headset'&&this.state==='air_kick'?HEADSET_AIR_KICK:this.appearance==='headset'&&this.state==='air_punch'?HEADSET_AIR_PUNCH:this.appearance==='headset'&&this.state==='punch'?HEADSET_PUNCH:this.appearance==='headset'&&this.state==='kick'?HEADSET_KICK:this.appearance==='fish'&&this.state==='air_kick'?FISH_AIR_KICK:this.appearance==='fish'&&this.state==='air_punch'?FISH_AIR_PUNCH:this.appearance==='fish'&&this.state==='kick'?FISH_KICK:this.appearance==='fish'&&this.state==='punch'?FISH_BITE:this.baseAppearance==='green'&&this.state==='air_kick'?GREEN_AIR_KICK:this.baseAppearance==='green'&&this.state==='air_punch'?GREEN_AIR_PUNCH:this.baseAppearance==='green'&&this.state==='punch'?GREEN_PUNCH:this.baseAppearance==='green'&&this.state==='kick'?GREEN_KICK:ATTACK_DATA[this.state];}
+ get renderScale(){return this.appearance==='commander'?1.15:this.appearance==='headset'?1.1:this.appearance==='fish'?1.5:this.baseAppearance==='green'?1.15:1;}
+ get attackData(){if(this.appearance==='commander')return COMMANDER_ATTACKS[this.state];return this.appearance==='blackcat'&&this.state==='air_kick'?BLACKCAT_AIR_KICK:this.appearance==='blackcat'&&this.state==='air_punch'?BLACKCAT_AIR_PUNCH:this.appearance==='blackcat'&&this.state==='kick'?BLACKCAT_KICK:this.appearance==='blackcat'&&this.state==='punch'?BLACKCAT_PUNCH:this.appearance==='gray'&&this.state==='air_kick'?GRAY_AIR_KICK:this.appearance==='gray'&&this.state==='air_punch'?GRAY_AIR_PUNCH:this.appearance==='gray'&&this.state==='kick'?GRAY_KICK:this.appearance==='gray'&&this.state==='punch'?GRAY_PUNCH:this.appearance==='headset'&&this.state==='air_kick'?HEADSET_AIR_KICK:this.appearance==='headset'&&this.state==='air_punch'?HEADSET_AIR_PUNCH:this.appearance==='headset'&&this.state==='punch'?HEADSET_PUNCH:this.appearance==='headset'&&this.state==='kick'?HEADSET_KICK:this.appearance==='fish'&&this.state==='air_kick'?FISH_AIR_KICK:this.appearance==='fish'&&this.state==='air_punch'?FISH_AIR_PUNCH:this.appearance==='fish'&&this.state==='kick'?FISH_KICK:this.appearance==='fish'&&this.state==='punch'?FISH_BITE:this.baseAppearance==='green'&&this.state==='air_kick'?GREEN_AIR_KICK:this.baseAppearance==='green'&&this.state==='air_punch'?GREEN_AIR_PUNCH:this.baseAppearance==='green'&&this.state==='punch'?GREEN_PUNCH:this.baseAppearance==='green'&&this.state==='kick'?GREEN_KICK:ATTACK_DATA[this.state];}
  get attackBox(){
   const box=this.attackData?.hitboxes?.[this.pose().frame];
   if(!box)return null;
@@ -63,7 +71,7 @@ class Character {
   this.guardDelay=Math.max(0,this.guardDelay-dt);
   if(this.guardDelay===0&&this.state!=='guard'&&this.state!=='hurt')this.guardMeter=Math.min(100,this.guardMeter+24*dt);
   this.stateTime+=dt;this.blockTime=Math.max(0,this.blockTime-dt);
-  if(this.state==='hurt'&&this.stateTime>=.85*2/3)this.enter(this.grounded?'idle':'jump');
+  if(this.state==='hurt'&&this.stateTime>=(this.appearance==='commander'?17/60:.85*2/3))this.enter(this.grounded?'idle':'jump');
   if(ATTACK_DATA[this.state]){const a=this.attackData;if(this.stateTime>=a.frames.length/a.fps)this.enter(this.grounded?'idle':'jump');}
   if(this.state==='land'&&this.stateTime>=.15)this.enter('idle');
   if(this.state==='guard'&&!input.guard&&this.blockTime===0)this.enter('idle');
@@ -89,6 +97,13 @@ class Character {
  }
  pose(){
   let animation=this.state,frame=0,label='';
+  if(this.appearance==='commander'&&['walk','dash'].includes(this.state)){const step=Math.floor(this.stateTime*(this.state==='dash'?48:24)*Math.max(.2,this.settings.speed/180))%24;return {animation:'commander_walk',frame:this.vx*this.facing<0?(24-step)%24:step,label:this.state==='dash'?'ダッシュ':'歩行'};}
+  if(this.appearance==='commander'&&this.state==='jump'){const ratio=Math.min(1,Math.abs(this.vy)/(this.jumpImpulse||1));return {animation:'commander_jump',frame:this.vy<0?Math.min(3,Math.floor((1-ratio)*4)):4+Math.min(3,Math.floor(ratio*4)),label:this.vy<0?'ジャンプ · 上昇':'ジャンプ · 下降'};}
+  if(this.appearance==='commander'&&this.state==='land')return {animation:'commander_jump',frame:8+Math.min(3,Math.floor(this.stateTime/.0375)),label:'着地'};
+  if(this.appearance==='commander'&&this.state==='down')return {animation:'commander_down',frame:Math.min(36,Math.floor(this.stateTime*30)),label:'KO · ダウン'};
+  if(this.appearance==='commander'&&this.state==='hurt')return {animation:'commander_hurt',frame:Math.min(16,Math.floor(this.stateTime*60)),label:'被弾 · のけぞり'};
+  if(this.appearance==='commander'&&this.state==='guard')return {animation:'commander_guard',frame:Math.min(4,Math.floor(this.stateTime*40)),label:this.blockTime>0?'ガード · 防御成功':'ガード'};
+  if(this.appearance==='commander'){const a=this.attackData;return {animation:['punch','kick','air_kick','air_punch'].includes(this.state)?'commander_'+this.state:'commander',frame:a?a.frames[Math.min(a.frames.length-1,Math.floor(this.stateTime*a.fps))]:0,label:({punch:'ナイフ斬り',kick:'前蹴り',air_kick:'ジャンプキック',air_punch:'ジャンプパンチ',guard:'ガード',down:'ダウン'})[this.state]||'軍隊長'};}
   if(this.appearance==='fish'&&['idle','walk','dash'].includes(this.state)){const rate=this.state==='dash'?21.6:this.state==='walk'?12:8;return {animation:'fish_swim',frame:Math.floor(this.stateTime*rate)%36,label:this.state==='idle'?'待機':this.state==='walk'?'歩行':'ダッシュ'};}
   if(this.appearance==='headset'&&['idle','walk','dash'].includes(this.state)){const step=Math.floor(this.stateTime*(this.state==='dash'?24:12)*Math.max(.2,this.settings.speed/180))%12;return {animation:this.state==='idle'?'headset_idle':this.state==='dash'?'headset_run':'headset_walk',frame:this.state==='idle'?0:this.vx*this.facing<0?(12-step)%12:step,label:this.state==='idle'?'待機':this.state==='dash'?'ダッシュ':'歩行'};}
   if(this.appearance==='blackcat'&&['walk','dash'].includes(this.state)){const running=this.state==='dash',count=running?16:24,step=Math.floor(this.stateTime*24*Math.max(.2,this.settings.speed/180))%count;return {animation:running?'blackcat_run':'blackcat_walk',frame:this.vx*this.facing<0?(count-step)%count:step,label:this.state==='dash'?'ダッシュ':'歩行'};}

@@ -117,19 +117,20 @@ function finishRound(){
  roundHistory.push({round:roundNumber,result,playerHP:actor.hp,cpuHP:enemy.hp});roundEndTime=0;
  const winner=result==='YOU WIN'?actor:result==='GAME OVER'?enemy:null;
  const loser=winner===actor?enemy:actor;
- if(winner?.appearance==='green'&&roundWins[winner===actor?0:1]===2&&rosterIds.includes(loser.appearance)&&loser.gameOver&&loser.hp===0)transformationTarget=loser;
+ if(winner?.appearance==='green'&&roundWins[winner===actor?0:1]===2&&(rosterIds.includes(loser.appearance)||loser.appearance==='commander')&&loser.gameOver&&loser.hp===0)transformationTarget=loser;
 }
 function showMatchResult(){
  if(playMode==='arcade'){
   const won=roundWins[0]===2;
   arcadeResults.push({opponent:enemy.appearance,won});
-  if(won&&arcadeMatchIndex<2){arcadeMatchIndex++;startArcadeMatch();return;}
+  if(won&&arcadeMatchIndex<arcadeOpponents.length-1){arcadeMatchIndex++;startArcadeMatch();return;}
  }
  if(!recordFromSelect)stopRecording();resultRecordTime=0;setScreen('result');
  const won=roundWins[0]===2;
  document.getElementById('matchOutcome').textContent=playMode==='arcade'?(won?'ARCADE CLEAR':'ARCADE OVER'):(won?'YOU WIN':'YOU LOSE');
- document.getElementById('matchScore').textContent=playMode==='arcade'?arcadeResults.filter(match=>match.won).length+' / 3':roundWins[0]+' − '+roundWins[1];
+ document.getElementById('matchScore').textContent=playMode==='arcade'?arcadeResults.filter(match=>match.won).length+' / '+arcadeOpponents.length:roundWins[0]+' − '+roundWins[1];
  document.getElementById('matchSummary').textContent=playMode==='arcade'?arcadeResults.map((match,i)=>'第'+(i+1)+'戦：'+fighterNames[match.opponent]+' '+(match.won?'勝利':'敗北')).join(' ／ '):roundHistory.map(r=>'第'+r.round+'ラウンド：'+(r.result==='DRAW'?'引き分け（再試合）':r.result==='YOU WIN'?'あなたの勝ち':'CPUの勝ち')).join(' ／ ');
+ if(playMode==='arcade'&&won){document.getElementById('matchScore').textContent='';document.getElementById('matchSummary').textContent='';}
  canvas.focus?.();
 }
 function advanceFrame(dt){
@@ -200,6 +201,26 @@ function transformationPose(c){
  if(c!==transformationTarget)return null;
  return {animation:'transform_'+c.appearance,frame:Math.min(72,Math.floor(roundEndTime*24))};
 }
+function drawCommander(c,p){
+ if(['commander_hurt','commander_down'].includes(p.animation)){ctx.save();ctx.translate(Math.round(c.x),Math.round(425+c.y));ctx.scale(c.facing*c.renderScale,c.renderScale);ctx.drawImage(sheets[p.animation],p.frame*320,0,320,288,-160,-270,320,288);ctx.restore();return;}
+ if(p.animation==='commander_air_punch'){ctx.save();ctx.translate(Math.round(c.x),Math.round(425+c.y));ctx.scale(c.facing*c.renderScale,c.renderScale);ctx.drawImage(sheets.commander_air_punch,p.frame*320,0,320,384,-160,-366,320,384);ctx.restore();return;}
+ if(['commander_walk','commander_punch','commander_kick','commander_jump','commander_air_kick','commander_guard','commander_hurt'].includes(p.animation)){ctx.save();ctx.translate(Math.round(c.x),Math.round(425+c.y));ctx.scale(c.facing*c.renderScale,c.renderScale);ctx.drawImage(sheets[p.animation],p.frame*320,0,320,256,-160,-238,320,256);ctx.restore();return;}
+ const attacking=!!c.attackData,phase=attacking?Math.sin(Math.PI*Math.min(1,c.stateTime/.6)):0;
+ const moving=['walk','dash'].includes(c.state),bob=moving?Math.sin(c.stateTime*18)*3:Math.sin(c.stateTime*3)*1.2;
+ ctx.save();ctx.translate(Math.round(c.x),Math.round(425+c.y));ctx.scale(c.facing*c.renderScale,c.renderScale);
+ if(c.state==='down'){ctx.translate(0,-12);ctx.rotate(-Math.min(1,c.stateTime*3)*Math.PI/2);}
+ else if(c.state==='hurt'){ctx.rotate(-.12);ctx.globalAlpha=.65+.35*Math.abs(Math.sin(c.stateTime*30));}
+ else if(c.state==='guard'){ctx.scale(.92,.94);}
+ ctx.translate(phase*30,bob);ctx.rotate(attacking?phase*.08:0);
+ ctx.drawImage(sheets.commander,225,50,825,1190,-79,-228,158,228);
+ if(attacking&&p.frame>=6&&p.frame<=9){
+  // The visible blade sweep occupies the same local bounds as the attack hitbox.
+  const [left,top,right,bottom]=c.attackData.hitboxes[p.frame];
+  ctx.fillStyle='#e9f5f3';ctx.beginPath();ctx.moveTo(left-160-30,top-238);
+  ctx.lineTo(right-160-30,(top+bottom)/2-238);ctx.lineTo(left-160-30,bottom-238);ctx.closePath();ctx.fill();
+ }
+ ctx.restore();
+}
 function drawCharacter(c,p){
  const transformed=transformationPose(c);
  if(transformed){
@@ -208,6 +229,7 @@ function drawCharacter(c,p){
  }
 
 
+ if(c.appearance==='commander'){drawCommander(c,p);return;}
  if(c.appearance==='blackcat'){
   ctx.save();ctx.translate(Math.round(c.x),Math.round(425+c.y));ctx.scale(c.facing,c.renderScale);
   if(c.state==='hurt')ctx.globalAlpha=.65+.35*Math.abs(Math.sin(c.stateTime*30));
@@ -266,7 +288,7 @@ function draw(p){
  if(loaded){ctx.imageSmoothingEnabled=false;drawCharacter(enemy,enemy.pose());drawCharacter(actor,p);}
  for(const [c,x,label,color] of [[actor,28,'1P',UI.player],[enemy,662,'CPU',UI.cpu]]){
   const right=c===enemy;
-  menuText(label+'  '+fighterNames[c.appearance],right?1072:x,31,20,UI.text,right?'right':'left');
+  menuText((c.appearance==='commander'?'BOSS':label)+'  '+fighterNames[c.appearance],right?1072:x,31,20,UI.text,right?'right':'left');
   ctx.fillStyle=UI.raised;ctx.fillRect(x,44,410,20);
   ctx.fillStyle=color;const hpWidth=410*Math.max(0,c.hp)/c.maxHp;
   ctx.fillRect(right?x+410-hpWidth:x,44,hpWidth,20);
@@ -274,7 +296,7 @@ function draw(p){
   const guardWidth=410*Math.max(0,c.guardMeter)/100;ctx.fillRect(right?x+410-guardWidth:x,71,guardWidth,5);
   menuText('●'.repeat(roundWins[right?1:0])+'○'.repeat(2-roundWins[right?1:0]),right?1072:x,95,18,UI.gold,right?'right':'left');
  }
- menuText(playMode==='arcade'?'ARCADE '+(arcadeMatchIndex+1)+' / 3':'ROUND '+roundNumber,550,29,15,UI.gold);
+ menuText(playMode==='arcade'?(enemy.appearance==='commander'?'FINAL BOSS':'ARCADE '+(arcadeMatchIndex+1)+' / '+arcadeOpponents.length):'ROUND '+roundNumber,550,29,15,UI.gold);
  menuText(String(Math.ceil(remainingTime)).padStart(2,'0'),550,73,42,UI.text);
  for(const e of effects){
   ctx.save();ctx.translate(e.x,e.y);ctx.globalAlpha=Math.min(1,e.life*8);ctx.strokeStyle=e.blocked?'#8de7f0':'#fff5a3';ctx.lineWidth=4;
@@ -294,7 +316,7 @@ const rosterIds=['mascot','green','gray','blackcat','headset','fish','white'];
 function arcadeOpponentIds(playerId){
  const start=rosterIds.indexOf(playerId),opponents=[];
  for(let offset=1;opponents.length<3;offset++){const id=rosterIds[(start+offset)%rosterIds.length];if(id!==playerId)opponents.push(id);}
- return opponents;
+ return [...opponents,'commander'];
 }
 function syncArcadePreview(){
  arcadeOpponents=arcadeOpponentIds(actor.appearance);arcadeMatchIndex=0;enemy.appearance=arcadeOpponents[0];
@@ -309,7 +331,7 @@ function startArcadeRun(){
  arcadeOpponents=arcadeOpponentIds(actor.appearance);arcadeMatchIndex=0;arcadeResults=[];startArcadeMatch();
 }
 const rosterColumns=3;
-const fighterNames={white:'メづすりν',blackcat:'黒猫',gray:'グレイ',mascot:'ようせい',green:'メづすりα',headset:'アネリア広報Bot',fish:'ダンクルオステウス'};
+const fighterNames={commander:'ワカ帝国軍隊長',white:'メづすりν',blackcat:'黒猫',gray:'グレイ',mascot:'ようせい',green:'メづすりα',headset:'アネリア広報Bot',fish:'ダンクルオステウス'};
 let cursorSide='player';
 function selectSide(side){if(playMode==='arcade'&&side==='enemy')return;cursorSide=side;drawPortraits();}
 function chooseFighter(id){
@@ -326,7 +348,8 @@ function moveSelectCursor(dx,dy){
 function paintPortrait(target,appearance,mirror=false){
  const pc=target.getContext('2d');if(!pc.clearRect)return;
  pc.clearRect(0,0,300,280);pc.imageSmoothingEnabled=false;pc.save();if(mirror){pc.translate(300,0);pc.scale(-1,1);}
- if(appearance==='blackcat')pc.drawImage(sheets.blackcat_idle,0,0,320,256,0,12,300,240);
+ if(appearance==='commander')pc.drawImage(sheets.commander,225,50,825,1190,60,0,180,260);
+ else if(appearance==='blackcat')pc.drawImage(sheets.blackcat_idle,0,0,320,256,0,12,300,240);
  else if(appearance==='gray')pc.drawImage(sheets.gray_idle,0,0,320,256,0,12,300,240);
  else if(appearance==='headset'){const scale=1.1/1.15;pc.drawImage(sheets.headset_idle,0,0,320,256,(300-300*scale)/2,252-240*scale,300*scale,240*scale);}
  else if(appearance==='fish')pc.drawImage(sheets.fish_swim,0,0,320,256,0,12,300,240);
@@ -358,7 +381,7 @@ document.getElementById('selectPlayer').onclick=()=>selectSide('player');
 document.getElementById('selectEnemy').onclick=()=>selectSide('enemy');
 for(const side of ['player','enemy'])for(const id of rosterIds){const b=document.getElementById((side==='player'?'':'enemy-')+'roster-'+id);b.onclick=()=>{if(playMode==='arcade'&&side==='enemy')return;selectSide(side);chooseFighter(id);};b.addEventListener('focus',()=>selectSide(side));}
 function showCharacterSelect(mode='vs'){
- recordNotice='';stopRecording();playMode=mode;arcadeResults=[];resetRound();cursorSide='player';
+ recordNotice='';stopRecording();if(enemy.appearance==='commander')enemy.appearance='mascot';playMode=mode;arcadeResults=[];resetRound();cursorSide='player';
  if(playMode==='arcade')syncArcadePreview();setScreen('select');drawPortraits();canvas.focus?.();
 }
 function showStageSelect(){setScreen('stage');canvas.focus?.();}
@@ -468,6 +491,7 @@ function drawMenu(){
    menuPortrait(actor.appearance,200,98,290,238);
    menuText(fighterNames[actor.appearance],345,349,20,UI.player);
    menuText('使用キャラクターを選択',550,354,13,UI.gold);
+   menuText('FINAL BOSS · ワカ帝国軍隊長',550,389,17,UI.gold);
   }else{
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
@@ -480,13 +504,18 @@ function drawMenu(){
   const won=roundWins[0]===2,arcade=playMode==='arcade';
   menuText(arcade?'ARCADE RESULT':'MATCH RESULT',550,65,15,UI.gold);
   menuText(arcade?(won?'ARCADE CLEAR':'ARCADE OVER'):(won?'YOU WIN':'YOU LOSE'),550,133,arcade?46:54,won?'#efc879':'#ebaaa3');
+  if(arcade&&won){
+   menuPortrait(actor.appearance,400,145,300,240);
+   menuText(fighterNames[actor.appearance],550,401,20,UI.player);
+  }else{
   menuPortrait(actor.appearance,70,145,300,240);menuPortrait(enemy.appearance,730,145,300,240,true);
   menuText(fighterNames[actor.appearance],220,401,20,UI.player);menuText(fighterNames[enemy.appearance],880,401,20,UI.cpu);
-  menuText(arcade?arcadeResults.filter(match=>match.won).length+' / 3':roundWins[0]+'  −  '+roundWins[1],550,212,48);
+  menuText(arcade?arcadeResults.filter(match=>match.won).length+' / '+arcadeOpponents.length:roundWins[0]+'  −  '+roundWins[1],550,212,48);
   // Draws can repeat indefinitely; show the most recent records and their total.
   const history=arcade?arcadeResults.map((match,i)=>({round:i+1,result:match.won?'YOU WIN':'GAME OVER',opponent:match.opponent})):roundHistory.slice(-4);
   history.forEach((r,i)=>menuText(arcade?'第'+r.round+'戦  ·  '+fighterNames[r.opponent]+'  '+(r.result==='YOU WIN'?'勝利':'敗北'):'第'+r.round+'ラウンド  ·  '+(r.result==='DRAW'?'引き分け':r.result==='YOU WIN'?'PLAYER 勝利':'CPU 勝利'),550,267+i*29,17,UI.muted));
   if(!arcade&&roundHistory.length>4)menuText('直近4戦 / 全'+roundHistory.length+'戦',550,397,13,UI.gold);
+  }
  }
  for(const b of menuButtons()){
   const focused=menuFocus===b.id||menuHover===b.id;
@@ -503,7 +532,7 @@ function drawMenu(){
   }
   else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
  }
- const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?(playMode==='arcade'?'矢印：キャラ　ARCADE STARTで3連戦を開始':'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応'):screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
+ const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?(playMode==='arcade'?'矢印：キャラ　3連戦の後、ワカ帝国軍隊長に挑戦':'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応'):screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
  menuText(note,550,screen==='title'?480:screen==='select'?507:screen==='stage'?496:495,screen==='select'||screen==='stage'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
 }
 function menuHit(e){
@@ -569,7 +598,7 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='KeyD')keys.guard=false;if(['ShiftLeft','ShiftRight'].includes(e.code))keys.dash=false;if(e.code==='ArrowLeft')keys.left=false;if(e.code==='ArrowRight')keys.right=false;});
 window.addEventListener('blur',()=>{keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;if(!result)setPaused(true);});
 document.querySelectorAll('[data-key]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);if(['damage','down'].includes(b.dataset.key))requestReaction(b.dataset.key);else if(b.dataset.key==='jump')requestJump();else if(attacks[b.dataset.key])requestAttack(b.dataset.key);else keys[b.dataset.key]=true;});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>{if(['left','right','dash','guard'].includes(b.dataset.key))keys[b.dataset.key]=false;});});
-Promise.all(['white_idle','white_guard','white_kick','white_punch','white_walk','white_jump','white_run','white_hurt','white_air_punch','white_down','white_air_kick','transform_white','beach','highway','restaurant','transform_blackcat','blackcat_air_kick','blackcat_air_punch','blackcat_down','blackcat_hurt','blackcat_jump','blackcat_guard','blackcat_kick','blackcat_punch','blackcat_run','blackcat_walk','blackcat_idle','gray_air_kick','gray_air_punch','transform_gray','gray_down','gray_hurt','gray_guard','gray_jump','gray_kick','gray_punch','gray_run','gray_walk','gray_idle','transform_headset','headset_air_kick','headset_air_punch','headset_down','headset_jump','headset_hurt','headset_guard','headset_punch','headset_kick','headset_run','headset_idle','headset_walk','transform_fish','fish_down','fish_air_kick','fish_air_punch','fish_kick','fish_jump','fish_guard','fish_bite','fish_hurt','fish_swim','transform_green','transform_mascot','library','idle','walk','jump','punch','kick','dash','damage','down','air_punch','air_kick','guard','green_idle','green_guard','green_kick','green_punch','green_walk','green_jump','green_run','green_hurt','green_air_punch','green_down','green_air_kick'].map(name=>new Promise((resolve,reject)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{sheets[name]=im;resolve();};im.onerror=()=>reject(new Error(name+'画像を読み込めませんでした'));im.src='assets/'+name+'.png';}))).then(()=>{loaded=true;document.getElementById("selectStatus").textContent="準備完了。キャラクターを選んで対戦開始。";drawPortraits();}).catch(e=>{assetError=e.message;document.querySelector('#error').textContent=e.message;document.getElementById('selectStatus').textContent=e.message+'。ページを開き直してください。';});
+Promise.all(['transform_commander','commander_down','commander_hurt','commander_guard','commander_air_punch','commander_air_kick','commander_jump','commander_kick','commander_punch','commander_walk','commander','white_idle','white_guard','white_kick','white_punch','white_walk','white_jump','white_run','white_hurt','white_air_punch','white_down','white_air_kick','transform_white','beach','highway','restaurant','transform_blackcat','blackcat_air_kick','blackcat_air_punch','blackcat_down','blackcat_hurt','blackcat_jump','blackcat_guard','blackcat_kick','blackcat_punch','blackcat_run','blackcat_walk','blackcat_idle','gray_air_kick','gray_air_punch','transform_gray','gray_down','gray_hurt','gray_guard','gray_jump','gray_kick','gray_punch','gray_run','gray_walk','gray_idle','transform_headset','headset_air_kick','headset_air_punch','headset_down','headset_jump','headset_hurt','headset_guard','headset_punch','headset_kick','headset_run','headset_idle','headset_walk','transform_fish','fish_down','fish_air_kick','fish_air_punch','fish_kick','fish_jump','fish_guard','fish_bite','fish_hurt','fish_swim','transform_green','transform_mascot','library','idle','walk','jump','punch','kick','dash','damage','down','air_punch','air_kick','guard','green_idle','green_guard','green_kick','green_punch','green_walk','green_jump','green_run','green_hurt','green_air_punch','green_down','green_air_kick'].map(name=>new Promise((resolve,reject)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{sheets[name]=im;resolve();};im.onerror=()=>reject(new Error(name+'画像を読み込めませんでした'));im.src='assets/'+name+'.png';}))).then(()=>{loaded=true;document.getElementById("selectStatus").textContent="準備完了。キャラクターを選んで対戦開始。";drawPortraits();}).catch(e=>{assetError=e.message;document.querySelector('#error').textContent=e.message;document.getElementById('selectStatus').textContent=e.message+'。ページを開き直してください。';});
 setScreen('title');requestAnimationFrame(tick);
 window.motionTest={get selectedStage(){return selectedStage;},chooseStage,draw,menuButtons,activateMenu,transformationPose,advanceFrame,showTitle,get screen(){return screen;},get playMode(){return playMode;},get arcadeMatchIndex(){return arcadeMatchIndex;},get arcadeResults(){return [...arcadeResults];},get roundNumber(){return roundNumber;},get roundWins(){return [...roundWins];},get roundHistory(){return [...roundHistory];},get hitStop(){return hitStop;},showCharacterSelect,get selecting(){return selecting;},actor,enemy,enemyAI,setPaused,get paused(){return paused;},get remainingTime(){return remainingTime;},get countdown(){return countdown;},get result(){return result;},config,keys,update,reset,requestJump,requestAttack,requestReaction,attacks,CharacterState};
 
