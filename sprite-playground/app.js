@@ -97,8 +97,8 @@ function setPaused(value){
 }
 document.getElementById('pause').onclick=()=>setPaused(!paused);
 function setScreen(next){
- screen=next;selecting=next!=='battle';last=0;menuFocus=null;menuHover=null;menuPointer=null;
- canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。VS MODE、ARCADE MODE、OPTIONSから選択',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、Enterでステージ選択へ進む',stage:'ステージ選択。ZとXでステージを切替、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。CPUの強さを選択',arcade:'アーケードモード。準備中'})[next]);
+ screen=next;selecting=next!=='battle';last=0;menuFocus=next==='title'?'vs':next==='options'?'difficulty:'+enemyAI.difficulty:null;menuHover=null;menuPointer=null;
+ canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。矢印キーでVS MODE、ARCADE MODE、OPTIONSを選択、EnterまたはSpaceで決定',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、Enterでステージ選択へ進む',stage:'ステージ選択。ZとXでステージを切替、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。矢印キーでCPUの強さを選択、EnterまたはSpaceで決定、Escでタイトルへ',arcade:'アーケードモード。準備中'})[next]);
  for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']])document.getElementById(id).hidden=next!==name;
  document.querySelector('main').setAttribute?.('data-screen',next);
  keys.left=keys.right=keys.dash=keys.guard=false;
@@ -345,28 +345,82 @@ function moveSelectCursor(dx,dy){
  if(dy){let row=Math.floor(i/rosterColumns);do{row=(row+dy+rows)%rows;next=row*rosterColumns+i%rosterColumns;}while(next>=rosterIds.length);}
  chooseFighter(rosterIds[next]);
 }
+// Keep the supplied JPEGs intact; key their magenta backdrop once at load time.
+const portraitIds=['commander','mascot','green','gray','blackcat','headset','white','fish'];
+const portraitBounds={};
+// Upper-body framing in the supplied 1254px artwork; thumbnails use faceCrops separately.
+const portraitCrops={
+ commander:[325,0,720,672],
+ mascot:[210,55,850,793],
+ green:[280,0,750,700],
+ gray:[355,20,560,523],
+ blackcat:[215,55,850,793],
+ headset:[325,10,600,560],
+ white:[335,0,720,672],
+ fish:[400,235,850,793]
+};
+
+function preparePortrait(im,name){
+ if(!im.naturalWidth)return im;
+ const surface=document.createElement('canvas');surface.width=im.naturalWidth;surface.height=im.naturalHeight;
+ const pc=surface.getContext('2d');pc.drawImage(im,0,0);
+ const pixels=pc.getImageData(0,0,surface.width,surface.height),data=pixels.data;
+ let left=surface.width,top=surface.height,right=-1,bottom=-1;
+ for(let y=0;y<surface.height;y++)for(let x=0;x<surface.width;x++){
+  const i=(y*surface.width+x)*4,r=data[i],g=data[i+1],b=data[i+2],spill=Math.min(r,b)-g;
+  if(spill>30&&r>g*1.15&&b>g*1.15){
+   const alpha=1-spill/255;
+   if(alpha<0.08)data[i+3]=0;
+   else{
+    data[i]=Math.max(0,(r-255*(1-alpha))/alpha);
+    data[i+1]=Math.min(255,g/alpha);
+    data[i+2]=Math.max(0,(b-255*(1-alpha))/alpha);
+    data[i+3]=Math.round(255*alpha);
+   }
+  }
+  if(data[i+3]>32){left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y);}
+ }
+ pc.putImageData(pixels,0,0);
+ portraitBounds[name]=right>=left?[left,top,right-left+1,bottom-top+1]:[0,0,surface.width,surface.height];
+ return surface;
+}
+function previewFighter(side,appearance){
+ const focus=menuHover||menuFocus;
+ return screen==='select'&&side===cursorSide&&focus?.startsWith('fighter:')?focus.slice(8):appearance;
+}
 function paintPortrait(target,appearance,mirror=false){
  const pc=target.getContext('2d');if(!pc.clearRect)return;
- pc.clearRect(0,0,300,280);pc.imageSmoothingEnabled=false;pc.save();if(mirror){pc.translate(300,0);pc.scale(-1,1);}
- if(appearance==='commander')pc.drawImage(sheets.commander,225,50,825,1190,60,0,180,260);
- else if(appearance==='blackcat')pc.drawImage(sheets.blackcat_idle,0,0,320,256,0,12,300,240);
- else if(appearance==='gray')pc.drawImage(sheets.gray_idle,0,0,320,256,0,12,300,240);
- else if(appearance==='headset'){const scale=1.1/1.15;pc.drawImage(sheets.headset_idle,0,0,320,256,(300-300*scale)/2,252-240*scale,300*scale,240*scale);}
- else if(appearance==='fish')pc.drawImage(sheets.fish_swim,0,0,320,256,0,12,300,240);
- else if(['green','white'].includes(appearance))pc.drawImage(sheets[appearance+'_idle'],205,95,390,1105,105,20,86,243);
- else pc.drawImage(sheets.idle,0,0,256,256,22,10,256,256);
+ pc.clearRect(0,0,300,280);pc.save();pc.imageSmoothingEnabled=true;if(mirror){pc.translate(300,0);pc.scale(-1,1);}
+ const key='portrait_'+appearance,im=sheets[key];
+ if(im){
+  const [sx,sy,sw,sh]=portraitCrops[appearance]||portraitBounds[key]||[0,0,im.width||1254,im.height||1254];
+  const scale=Math.min(284/sw,264/sh),w=sw*scale,h=sh*scale;
+  pc.drawImage(im,sx,sy,sw,sh,(300-w)/2,(280-h)/2,w,h);
+ }
  pc.restore();
 }
-const faceCrops={white:['white_idle',250,90,320,320],blackcat:['blackcat_idle',120,17,96,100],gray:['gray_idle',132,14,62,62],mascot:['idle',78,20,108,108],green:['green_idle',250,90,320,320],headset:['headset_idle',129,13,65,65],fish:['fish_swim',192,75,96,96]};
+// Selection-only face crops from the approved action artwork. Battle sprites and fish stay unchanged.
+// Nu's source artwork already contains its silver palette and horizontal reflection.
+const faceCrops={
+ commander:['select_commander',510,65,340,340],
+ mascot:['select_mascot',300,120,620,620],
+ green:['select_green',230,275,380,380],
+ gray:['select_gray',460,20,330,330],
+ blackcat:['select_blackcat',450,170,470,470],
+ headset:['select_headset',310,145,390,390],
+ white:['select_white',385,275,380,380],
+ fish:['fish_swim',192,75,96,96]
+};
 function paintFace(target,id,mirror){
  const pc=target.getContext('2d');if(!pc.clearRect)return;
  const [sheet,x,y,w,h]=faceCrops[id];pc.clearRect(0,0,80,80);pc.imageSmoothingEnabled=false;pc.save();if(mirror){pc.translate(80,0);pc.scale(-1,1);}pc.drawImage(sheets[sheet],x,y,w,h,0,0,80,80);pc.restore();
 }
 function drawPortraits(){
  for(const [side,c] of [['player',actor],['enemy',enemy]]){
-  document.getElementById(side+'Name').textContent=fighterNames[c.appearance];
+  const preview=previewFighter(side,c.appearance);
+  document.getElementById(side+'Name').textContent=fighterNames[preview];
   document.getElementById(side+'Description').textContent=c.appearance==='blackcat'?'Aはストレート、Sは蹴り上げ、Dで伏せガード。':c.appearance==='gray'?'Aはストレート、Sはハイキック、Dでガード。空中Aは振り下ろし、空中Sは前蹴り。':c.appearance==='headset'?'Aはストレート、Sは素早いキック。':c.appearance==='fish'?'Aは噛みつき、Sは歯のキック。':c.baseAppearance==='green'?'筒の突きと素早い小キック。':'長いリーチと重いキック。';
-  if(loaded)paintPortrait(document.getElementById(side+'Portrait'),c.appearance,side==='enemy');
+  if(loaded)paintPortrait(document.getElementById(side+'Portrait'),preview,side==='enemy');
  }
  document.getElementById('cursorHelp').textContent=(cursorSide==='player'?'1P':'CPU')+'のキャラクターを選択中';
  for(const side of ['player','enemy'])document.getElementById(side==='player'?'selectPlayer':'selectEnemy').setAttribute?.('aria-pressed',String(cursorSide===side));
@@ -460,7 +514,7 @@ function menuText(text,x,y,size=20,color=UI.text,align='center'){
 }
 function menuPortrait(id,x,y,w=300,h=260,mirror=false){
  if(!loaded)return;
- ctx.save();ctx.translate(x,y);ctx.scale(w/300,h/280);
+ ctx.save();const scale=Math.min(w/300,h/280);ctx.translate(x+(w-300*scale)/2,y+(h-280*scale)/2);ctx.scale(scale,scale);
  // Reuse portrait framing without clearing the background canvas.
  const proxy={getContext:()=>({clearRect(){},set imageSmoothingEnabled(v){ctx.imageSmoothingEnabled=v;},save:()=>ctx.save(),restore:()=>ctx.restore(),translate:(...a)=>ctx.translate(...a),scale:(...a)=>ctx.scale(...a),drawImage:(...a)=>ctx.drawImage(...a)})};
  paintPortrait(proxy,id,mirror);ctx.restore();
@@ -488,15 +542,17 @@ function drawMenu(){
  }else if(screen==='select'){
   if(playMode==='arcade'){
    ctx.fillStyle='#3b77752b';ctx.fillRect(200,106,290,244);
-   menuPortrait(actor.appearance,200,98,290,238);
-   menuText(fighterNames[actor.appearance],345,349,20,UI.player);
+   const preview=previewFighter('player',actor.appearance);
+   menuPortrait(preview,200,98,290,238);
+   menuText(fighterNames[preview],345,349,20,UI.player);
    menuText('使用キャラクターを選択',550,354,13,UI.gold);
    menuText('FINAL BOSS · ワカ帝国軍隊長',550,389,17,UI.gold);
   }else{
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
-   menuPortrait(c.appearance,x,98,290,238,side==='enemy');
-   menuText(fighterNames[c.appearance],x+145,349,20,side==='player'?UI.player:UI.cpu);
+   const preview=previewFighter(side,c.appearance);
+   menuPortrait(preview,x,98,290,238,side==='enemy');
+   menuText(fighterNames[preview],x+145,349,20,side==='player'?UI.player:UI.cpu);
   }
   menuText((cursorSide==='player'?'PLAYER':'CPU')+'を選択中',550,354,13,UI.gold);
   }
@@ -532,7 +588,7 @@ function drawMenu(){
   }
   else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
  }
- const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?(playMode==='arcade'?'矢印：キャラ　3連戦の後、ワカ帝国軍隊長に挑戦':'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応'):screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'VS MODE を選択':'クリックまたはキーボードで進む';
+ const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?(playMode==='arcade'?'矢印：キャラ　3連戦の後、ワカ帝国軍隊長に挑戦':'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応'):screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'↑ / ↓：選択　Enter / Space：決定':screen==='options'?'矢印：選択　Enter / Space：決定　Esc：戻る':'クリックまたはキーボードで進む';
  menuText(note,550,screen==='title'?480:screen==='select'?507:screen==='stage'?496:495,screen==='select'||screen==='stage'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
 }
 function menuHit(e){
@@ -542,9 +598,9 @@ function menuHit(e){
 }
 canvas.addEventListener('pointerdown',e=>{if(!selecting)return;e.preventDefault();canvas.focus?.();menuFocus=null;menuPointer={id:menuHit(e),pointerId:e.pointerId,screen};canvas.setPointerCapture?.(e.pointerId);});
 canvas.addEventListener('pointerup',e=>{const pressed=menuPointer;menuPointer=null;if(!pressed||pressed.pointerId!==e.pointerId||pressed.screen!==screen)return;const hit=menuHit(e);if(pressed.id&&pressed.id===hit)activateMenu(hit);});
-canvas.addEventListener('pointermove',e=>{menuHover=selecting?menuHit(e):null;if(canvas.style)canvas.style.cursor=menuHover?'pointer':'default';});
+canvas.addEventListener('pointermove',e=>{const previous=menuHover;menuHover=selecting?menuHit(e):null;if(canvas.style)canvas.style.cursor=menuHover?'pointer':'default';if(screen==='select'&&menuHover!==previous)drawPortraits();});
 for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,()=>{menuPointer=null;});
-canvas.addEventListener('pointerleave',()=>{menuHover=null;});
+canvas.addEventListener('pointerleave',()=>{menuHover=null;if(screen==='select')drawPortraits();});
 
 function tick(t){const dt=last?Math.min((t-last)/1000,.033):0;last=t;draw(advanceFrame(dt));requestAnimationFrame(tick);}
 for(const name of ['speed','height','gravity'])document.getElementById(name).addEventListener('input',e=>{config[name]=Number(e.target.value);document.getElementById(name+'Value').value=config[name];});
@@ -556,7 +612,7 @@ window.addEventListener('keydown',e=>{
   e.preventDefault();
   if(screen==='stage')showCharacterSelect();
   else if(['select','result','options','arcade'].includes(screen))showTitle();
-  else setPaused(!paused);
+  else if(screen==='battle')setPaused(!paused);
   return;
  }
  if(e.target.matches('input,textarea,select'))return;
@@ -564,15 +620,20 @@ window.addEventListener('keydown',e=>{
  if(selecting){
   if(k==='Tab'&&e.target===canvas){
    e.preventDefault();const buttons=menuButtons(),i=buttons.findIndex(b=>b.id===menuFocus);
-   menuFocus=buttons[(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.id;return;
+   menuHover=null;menuFocus=buttons[i<0?(e.shiftKey?buttons.length-1:0):(i+(e.shiftKey?-1:1)+buttons.length)%buttons.length]?.id;return;
+  }
+  if(['title','options'].includes(screen)&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(k)){
+   e.preventDefault();canvas.focus?.();menuHover=null;
+   const buttons=menuButtons(),i=buttons.findIndex(b=>b.id===menuFocus),direction=['ArrowUp','ArrowLeft'].includes(k)?-1:1;
+   menuFocus=buttons[i<0?(direction<0?buttons.length-1:0):(i+direction+buttons.length)%buttons.length]?.id;return;
   }
   if((k==='Enter'||k==='Space')&&!e.repeat&&menuFocus){e.preventDefault();activateMenu(menuFocus);return;}
   if(screen==='select'){
    const moves={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
-   if(moves[k]){e.preventDefault();menuFocus=null;moveSelectCursor(...moves[k]);return;}
-   if(k==='Digit1'||k==='Digit2'){e.preventDefault();menuFocus=null;selectSide(k==='Digit1'?'player':'enemy');return;}
+   if(moves[k]){e.preventDefault();menuFocus=null;menuHover=null;moveSelectCursor(...moves[k]);return;}
+   if(k==='Digit1'||k==='Digit2'){e.preventDefault();menuFocus=null;menuHover=null;selectSide(k==='Digit1'?'player':'enemy');return;}
   }
-  if(screen==='stage'&&(k==='KeyZ'||k==='KeyX')&&!e.repeat){e.preventDefault();cycleStage(k==='KeyZ'?-1:1);return;}
+  if(screen==='stage'&&(k==='KeyZ'||k==='KeyX')&&!e.repeat){e.preventDefault();menuFocus=null;cycleStage(k==='KeyZ'?-1:1);return;}
   if(k==='Enter'&&!e.repeat){
    e.preventDefault();
    if(screen==='title')activateMenu('vs');
@@ -598,8 +659,8 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='KeyD')keys.guard=false;if(['ShiftLeft','ShiftRight'].includes(e.code))keys.dash=false;if(e.code==='ArrowLeft')keys.left=false;if(e.code==='ArrowRight')keys.right=false;});
 window.addEventListener('blur',()=>{keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;if(!result)setPaused(true);});
 document.querySelectorAll('[data-key]').forEach(b=>{b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);if(['damage','down'].includes(b.dataset.key))requestReaction(b.dataset.key);else if(b.dataset.key==='jump')requestJump();else if(attacks[b.dataset.key])requestAttack(b.dataset.key);else keys[b.dataset.key]=true;});for(const event of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(event,()=>{if(['left','right','dash','guard'].includes(b.dataset.key))keys[b.dataset.key]=false;});});
-Promise.all(['transform_commander','commander_down','commander_hurt','commander_guard','commander_air_punch','commander_air_kick','commander_jump','commander_kick','commander_punch','commander_walk','commander','white_idle','white_guard','white_kick','white_punch','white_walk','white_jump','white_run','white_hurt','white_air_punch','white_down','white_air_kick','transform_white','beach','highway','restaurant','transform_blackcat','blackcat_air_kick','blackcat_air_punch','blackcat_down','blackcat_hurt','blackcat_jump','blackcat_guard','blackcat_kick','blackcat_punch','blackcat_run','blackcat_walk','blackcat_idle','gray_air_kick','gray_air_punch','transform_gray','gray_down','gray_hurt','gray_guard','gray_jump','gray_kick','gray_punch','gray_run','gray_walk','gray_idle','transform_headset','headset_air_kick','headset_air_punch','headset_down','headset_jump','headset_hurt','headset_guard','headset_punch','headset_kick','headset_run','headset_idle','headset_walk','transform_fish','fish_down','fish_air_kick','fish_air_punch','fish_kick','fish_jump','fish_guard','fish_bite','fish_hurt','fish_swim','transform_green','transform_mascot','library','idle','walk','jump','punch','kick','dash','damage','down','air_punch','air_kick','guard','green_idle','green_guard','green_kick','green_punch','green_walk','green_jump','green_run','green_hurt','green_air_punch','green_down','green_air_kick'].map(name=>new Promise((resolve,reject)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{sheets[name]=im;resolve();};im.onerror=()=>reject(new Error(name+'画像を読み込めませんでした'));im.src='assets/'+name+'.png';}))).then(()=>{loaded=true;document.getElementById("selectStatus").textContent="準備完了。キャラクターを選んで対戦開始。";drawPortraits();}).catch(e=>{assetError=e.message;document.querySelector('#error').textContent=e.message;document.getElementById('selectStatus').textContent=e.message+'。ページを開き直してください。';});
-setScreen('title');requestAnimationFrame(tick);
+Promise.all([...portraitIds.map(id=>'portrait_'+id),'select_commander','select_mascot','select_green','select_gray','select_blackcat','select_headset','select_white','transform_commander','commander_down','commander_hurt','commander_guard','commander_air_punch','commander_air_kick','commander_jump','commander_kick','commander_punch','commander_walk','commander','white_idle','white_guard','white_kick','white_punch','white_walk','white_jump','white_run','white_hurt','white_air_punch','white_down','white_air_kick','transform_white','beach','highway','restaurant','transform_blackcat','blackcat_air_kick','blackcat_air_punch','blackcat_down','blackcat_hurt','blackcat_jump','blackcat_guard','blackcat_kick','blackcat_punch','blackcat_run','blackcat_walk','blackcat_idle','gray_air_kick','gray_air_punch','transform_gray','gray_down','gray_hurt','gray_guard','gray_jump','gray_kick','gray_punch','gray_run','gray_walk','gray_idle','transform_headset','headset_air_kick','headset_air_punch','headset_down','headset_jump','headset_hurt','headset_guard','headset_punch','headset_kick','headset_run','headset_idle','headset_walk','transform_fish','fish_down','fish_air_kick','fish_air_punch','fish_kick','fish_jump','fish_guard','fish_bite','fish_hurt','fish_swim','transform_green','transform_mascot','library','idle','walk','jump','punch','kick','dash','damage','down','air_punch','air_kick','guard','green_idle','green_guard','green_kick','green_punch','green_walk','green_jump','green_run','green_hurt','green_air_punch','green_down','green_air_kick'].map(name=>new Promise((resolve,reject)=>{const im=new Image();im.crossOrigin='anonymous';im.onload=()=>{try{sheets[name]=name.startsWith('portrait_')?preparePortrait(im,name):im;resolve();}catch(e){reject(e);}};im.onerror=()=>reject(new Error(name+'画像を読み込めませんでした'));im.src='assets/'+name+(name.startsWith('portrait_')?'.jpg':'.png');}))).then(()=>{loaded=true;document.getElementById("selectStatus").textContent="準備完了。キャラクターを選んで対戦開始。";drawPortraits();}).catch(e=>{assetError=e.message;document.querySelector('#error').textContent=e.message;document.getElementById('selectStatus').textContent=e.message+'。ページを開き直してください。';});
+setScreen('title');canvas.focus?.();requestAnimationFrame(tick);
 window.motionTest={get selectedStage(){return selectedStage;},chooseStage,draw,menuButtons,activateMenu,transformationPose,advanceFrame,showTitle,get screen(){return screen;},get playMode(){return playMode;},get arcadeMatchIndex(){return arcadeMatchIndex;},get arcadeResults(){return [...arcadeResults];},get roundNumber(){return roundNumber;},get roundWins(){return [...roundWins];},get roundHistory(){return [...roundHistory];},get hitStop(){return hitStop;},showCharacterSelect,get selecting(){return selecting;},actor,enemy,enemyAI,setPaused,get paused(){return paused;},get remainingTime(){return remainingTime;},get countdown(){return countdown;},get result(){return result;},config,keys,update,reset,requestJump,requestAttack,requestReaction,attacks,CharacterState};
 
 if(document.modelContext?.registerTool){

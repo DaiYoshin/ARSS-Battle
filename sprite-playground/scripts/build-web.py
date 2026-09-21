@@ -17,7 +17,7 @@ def main():
         for name in ("app.js","character.js","style.css"):
             shutil.copyfile(SOURCE/name,stage/name)
         (stage/"assets").mkdir()
-        for asset in sorted((SOURCE/"assets").glob("*.png")):
+        for asset in sorted((p for p in (SOURCE/"assets").iterdir() if p.suffix in (".png",".jpg"))):
             shutil.copyfile(asset,stage/"assets"/asset.name)
         files=sorted(p for p in stage.rglob("*") if p.is_file())
         assert len(files)<1000
