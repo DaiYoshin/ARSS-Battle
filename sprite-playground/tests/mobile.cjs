@@ -18,6 +18,8 @@ const root=path.resolve(__dirname,'..'),output=path.join(root,'../.qa-canvas');
    await page.waitForFunction(()=>document.getElementById('mobileGate').hidden);
    const tap=async id=>{const b=await page.evaluate(id=>motionTest.menuButtons().find(b=>b.id===id),id),r=await page.locator('#game').boundingBox();await page.touchscreen.tap(r.x+(b.x+b.w/2)*r.width/1100,r.y+(b.y+b.h/2)*r.height/520);};
    await tap('vs');await tap('stage');await tap('fight');assert.equal(await page.evaluate(()=>motionTest.screen),'battle');
+   assert.equal(await page.evaluate(()=>motionTest.countdown),3);
+   await page.waitForFunction(()=>document.querySelector('main').dataset.transition==='false');
    for(const selector of ['#game','#movePad','.action-pad','#mobilePause']){const r=await page.locator(selector).boundingBox(),v=page.viewportSize();assert(r&&r.x>=0&&r.y>=0&&r.x+r.width<=v.width+1&&r.y+r.height<=v.height+1,selector+' fits viewport');}
    const r=await page.locator('#game').boundingBox();assert(Math.abs(r.width/r.height-1100/520)<.01);
    await page.evaluate(()=>{motionTest.advanceFrame(3);motionTest.enemyAI.cooldown=1000;});

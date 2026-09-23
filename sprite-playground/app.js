@@ -16,9 +16,11 @@ for(const [id,c] of [['playerCharacter',actor],['enemyCharacter',enemy]])documen
 document.getElementById('difficulty').addEventListener('change',e=>{enemyAI.difficulty=e.target.value;});
 let result=null,countdown=3,fightCueTime=0,remainingTime=90,paused=false,selecting=true;
 let menuFocus=null,menuHover=null,menuPointer=null,assetError='';
+let menuFeedback=null;
 let screen='title',roundNumber=1,roundWins=[0,0],roundHistory=[],roundEndTime=0;
 let playMode='vs',arcadeOpponents=[],arcadeMatchIndex=0,arcadeResults=[];
 let transformationTarget=null;
+let battleFade=null;
 let effects=[],hitStop=0;
 let audioContext=null,soundEnabled=false;
 const soundButton=document.getElementById('sound');
@@ -97,6 +99,13 @@ function setPaused(value){
 }
 document.getElementById('pause').onclick=()=>setPaused(!paused);
 function setScreen(next){
+ // Preserve the outgoing canvas so stage changes happen behind the blackout.
+ battleFade=null;
+ if(next==='battle'&&typeof canvas.cloneNode==='function'){
+  const snapshot=canvas.cloneNode(false);snapshot.getContext('2d').drawImage(canvas,0,0);
+  battleFade={snapshot,elapsed:0};
+ }
+ document.querySelector('main').setAttribute?.('data-transition',battleFade?'true':'false');
  document.querySelector('main').setAttribute?.('data-paused',String(paused));
  screen=next;selecting=next!=='battle';last=0;menuFocus=next==='title'?'vs':next==='options'?'difficulty:'+enemyAI.difficulty:null;menuHover=null;menuPointer=null;
  canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。矢印キーでVS MODE、ARCADE MODE、OPTIONSを選択、EnterまたはSpaceで決定',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、Enterでステージ選択へ進む',stage:'ステージ選択。ZとXでステージを切替、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。矢印キーでCPUの強さを選択、EnterまたはSpaceで決定、Escでタイトルへ',arcade:'アーケードモード。準備中'})[next]);
@@ -496,6 +505,7 @@ function menuButtons(){
 }
 function activateMenu(id){
  if(!menuButtons().some(b=>b.id===id))return;
+ menuFeedback={id,screen,until:Date.now()+180};
  if(id==='vs')showCharacterSelect('vs');
  else if(id==='arcade')showCharacterSelect('arcade');
  else if(id==='options')setScreen('options');
@@ -575,8 +585,10 @@ function drawMenu(){
  }
  for(const b of menuButtons()){
   const focused=menuFocus===b.id||menuHover===b.id;
+  const pressed=(menuPointer?.id===b.id&&menuPointer.screen===screen)||(menuFeedback?.id===b.id&&menuFeedback.screen===screen&&Date.now()<menuFeedback.until);
+  ctx.save();if(pressed){ctx.translate(b.x+b.w/2,b.y+b.h/2+2);ctx.scale(.97,.97);ctx.translate(-b.x-b.w/2,-b.y-b.h/2);}
   ctx.beginPath();ctx.roundRect(b.x,b.y,b.w,b.h,8);
-  ctx.fillStyle=b.primary?UI.gold:b.selected?UI.raised:UI.surface;ctx.fill();
+  ctx.fillStyle=pressed?'#f2d8a6':b.primary?UI.gold:b.selected?UI.raised:UI.surface;ctx.fill();
   ctx.strokeStyle=focused?UI.text:b.selected?(b.side==='enemy'?UI.cpu:UI.player):UI.line;ctx.lineWidth=focused||b.selected?3:1;ctx.stroke();
   if(b.fighter){
    if(loaded){const [sheet,x,y,w,h]=faceCrops[b.fighter],size=Math.min(86,b.w-8,b.h-8);ctx.drawImage(sheets[sheet],x,y,w,h,b.x+(b.w-size)/2,b.y+4,size,size);}
@@ -586,7 +598,9 @@ function drawMenu(){
    ctx.fillStyle='#101c1de0';ctx.fillRect(b.x+2,b.y+b.h-31,b.w-4,29);
    menuText(b.label,b.x+b.w/2,b.y+b.h-10,16,b.selected?UI.gold:UI.text);
   }
-  else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,b.primary?UI.bg:UI.text);
+  else menuText(b.label,b.x+b.w/2,b.y+b.h/2+7,19,pressed||b.primary?UI.bg:UI.text);
+  if(pressed){ctx.fillStyle='#fff3';ctx.fillRect(b.x+3,b.y+3,b.w-6,b.h-6);ctx.strokeStyle=UI.gold;ctx.lineWidth=3;ctx.strokeRect(b.x,b.y,b.w,b.h);}
+  ctx.restore();
  }
  const note=screen==='select'&&recordNotice?recordNotice:assetError?'読込エラー：'+assetError:!loaded?'画像を読み込み中…':screen==='select'?(playMode==='arcade'?'矢印：キャラ　3連戦の後、ワカ帝国軍隊長に挑戦':'矢印：キャラ　1 / 2：操作側　クリックまたはキーボード対応'):screen==='stage'?'Z / X：ステージ切替　クリックまたはEnterで決定':screen==='title'?'↑ / ↓：選択　Enter / Space：決定':screen==='options'?'矢印：選択　Enter / Space：決定　Esc：戻る':'クリックまたはキーボードで進む';
  menuText(note,550,screen==='title'?480:screen==='select'?507:screen==='stage'?496:495,screen==='select'||screen==='stage'?13:15,assetError?'#ffb7ad':UI.muted);ctx.textAlign='left';
@@ -596,13 +610,28 @@ function menuHit(e){
  const x=(e.clientX-r.left)*1100/r.width,y=(e.clientY-r.top)*520/r.height;
  return menuButtons().find(b=>x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h)?.id??null;
 }
-canvas.addEventListener('pointerdown',e=>{if(!selecting)return;e.preventDefault();canvas.focus?.();menuFocus=null;menuPointer={id:menuHit(e),pointerId:e.pointerId,screen};canvas.setPointerCapture?.(e.pointerId);});
+canvas.addEventListener('pointerdown',e=>{if(!selecting)return;e.preventDefault();canvas.focus?.();menuFocus=null;menuPointer={id:menuHit(e),pointerId:e.pointerId,screen};canvas.setPointerCapture?.(e.pointerId);drawMenu();});
 canvas.addEventListener('pointerup',e=>{const pressed=menuPointer;menuPointer=null;if(!pressed||pressed.pointerId!==e.pointerId||pressed.screen!==screen)return;const hit=menuHit(e);if(pressed.id&&pressed.id===hit)activateMenu(hit);});
 canvas.addEventListener('pointermove',e=>{const previous=menuHover;menuHover=selecting?menuHit(e):null;if(canvas.style)canvas.style.cursor=menuHover?'pointer':'default';if(screen==='select'&&menuHover!==previous)drawPortraits();});
 for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,()=>{menuPointer=null;});
 canvas.addEventListener('pointerleave',()=>{menuHover=null;if(screen==='select')drawPortraits();});
 
-function tick(t){const dt=last?Math.min((t-last)/1000,.033):0;last=t;draw(advanceFrame(dt));requestAnimationFrame(tick);}
+function drawBattleFade(dt){
+ const fade=battleFade;fade.elapsed+=dt;
+ const out=.25,hold=.10,into=.35,total=out+hold+into;
+ if(fade.elapsed<out){ctx.clearRect(0,0,1100,520);ctx.drawImage(fade.snapshot,0,0);}
+ else draw(actor.pose());
+ const opacity=fade.elapsed<out?fade.elapsed/out:fade.elapsed<out+hold?1:Math.max(0,1-(fade.elapsed-out-hold)/into);
+ ctx.save();ctx.globalAlpha=opacity;ctx.fillStyle='#000';ctx.fillRect(0,0,1100,520);ctx.restore();
+ keys.left=keys.right=keys.dash=keys.guard=false;
+ if(fade.elapsed>=total){battleFade=null;document.querySelector('main').setAttribute?.('data-transition','false');last=0;}
+}
+function tick(t){
+ const dt=last?Math.min((t-last)/1000,.033):0;last=t;
+ if(battleFade)drawBattleFade(dt);
+ else{const pose=advanceFrame(dt);if(battleFade)drawBattleFade(0);else draw(pose);}
+ requestAnimationFrame(tick);
+}
 for(const name of ['speed','height','gravity'])document.getElementById(name).addEventListener('input',e=>{config[name]=Number(e.target.value);document.getElementById(name+'Value').value=config[name];});
 document.getElementById('reset').onclick=reset;
 window.addEventListener('keydown',e=>{
@@ -749,4 +778,14 @@ if(typeof window.matchMedia==='function'){
   }
  },{passive:false});
  document.addEventListener('touchcancel',()=>taps.clear(),{passive:true});
+}
+
+// Brief feedback for semantic buttons, including Safari's touch-to-click bridge.
+if(typeof window.matchMedia==='function'){
+ const timers=new WeakMap();
+ document.addEventListener('click',e=>{
+  const button=e.target.closest?.('button:not([data-key])');if(!button||button.disabled)return;
+  clearTimeout(timers.get(button));button.classList.add('button-feedback');
+  timers.set(button,setTimeout(()=>button.classList.remove('button-feedback'),180));
+ },true);
 }
