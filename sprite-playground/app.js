@@ -91,12 +91,13 @@ function startRecording(){
 recordButton.onclick=startRecording;
 function setPaused(value){
  if(result||selecting)return;
- paused=value;keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;
+ paused=value;document.querySelector('main').setAttribute?.('data-paused',String(value));keys.left=keys.right=keys.dash=keys.guard=false;actor.jumpBuffer=0;last=0;
  document.getElementById('pause').textContent=paused?'再開 (Esc)':'一時停止 (Esc)';
  if(recorder){if(paused&&recorder.state==='recording')recorder.pause();else if(!paused&&recorder.state==='paused')recorder.resume();}
 }
 document.getElementById('pause').onclick=()=>setPaused(!paused);
 function setScreen(next){
+ document.querySelector('main').setAttribute?.('data-paused',String(paused));
  screen=next;selecting=next!=='battle';last=0;menuFocus=next==='title'?'vs':next==='options'?'difficulty:'+enemyAI.difficulty:null;menuHover=null;menuPointer=null;
  canvas.setAttribute?.('aria-label',({title:'ARSS BATTLE。矢印キーでVS MODE、ARCADE MODE、OPTIONSを選択、EnterまたはSpaceで決定',select:'キャラクター選択。矢印で選択、1と2で自分とCPU切替、Enterでステージ選択へ進む',stage:'ステージ選択。ZとXでステージを切替、Enterで対戦開始',battle:'対戦画面',result:'試合結果。Enterでタイトルへ',options:'オプション。矢印キーでCPUの強さを選択、EnterまたはSpaceで決定、Escでタイトルへ',arcade:'アーケードモード。準備中'})[next]);
  for(const [id,name] of [['titleScreen','title'],['characterSelect','select'],['resultScreen','result']])document.getElementById(id).hidden=next!==name;
@@ -546,7 +547,6 @@ function drawMenu(){
    menuPortrait(preview,200,98,290,238);
    menuText(fighterNames[preview],345,349,20,UI.player);
    menuText('使用キャラクターを選択',550,354,13,UI.gold);
-   menuText('FINAL BOSS · ワカ帝国軍隊長',550,389,17,UI.gold);
   }else{
   for(const [side,c,x] of [['player',actor,44],['enemy',enemy,766]]){
    ctx.fillStyle=side==='player'?'#3b77752b':'#965c592b';ctx.fillRect(x,106,290,244);
@@ -665,4 +665,88 @@ window.motionTest={get selectedStage(){return selectedStage;},chooseStage,draw,m
 
 if(document.modelContext?.registerTool){
  Promise.resolve(document.modelContext.registerTool({name:'configure_motion_test',description:'Adjust movement speed, jump height and gravity in the motion test.',inputSchema:{type:'object',properties:{speed:{type:'number',minimum:80,maximum:360},height:{type:'number',minimum:60,maximum:220},gravity:{type:'number',minimum:500,maximum:1800}},additionalProperties:false},annotations:{readOnlyHint:false},execute(input){if(!input||typeof input!=='object')throw new Error('Invalid settings');const ranges={speed:[80,360],height:[60,220],gravity:[500,1800]};for(const [key,value]of Object.entries(input)){if(!ranges[key]||typeof value!=='number'||!Number.isFinite(value)||value<ranges[key][0]||value>ranges[key][1])throw new Error('Invalid '+key);}for(const [key,value]of Object.entries(input)){config[key]=value;document.getElementById(key).value=value;document.getElementById(key+'Value').value=value;}return {...config};}})).catch(()=>{});
+}
+
+// Fullscreen is optional: orientation and API failures must never prevent play.
+if(typeof window.matchMedia==='function'){
+ const mobileQuery=window.matchMedia('(any-pointer: coarse)'),gate=document.getElementById('mobileGate');
+ const start=document.getElementById('mobileStart'),hint=document.getElementById('mobileHint'),fullscreen=document.getElementById('mobileFullscreen');
+ let entered=false;
+ function syncMobileViewport(){
+  const mobile=mobileQuery.matches,portrait=window.innerHeight>window.innerWidth;
+  document.body.classList.toggle('mobile',mobile);fullscreen.hidden=true;
+  gate.hidden=!mobile||(entered&&!portrait);
+  start.hidden=entered&&portrait;
+  hint.textContent=entered?'スマホを横にしてください。画面の回転ロックも解除してください。':'横画面でプレイします。スマホを横にして「プレイ開始」を押してください。';
+  if(mobile&&!gate.hidden&&screen==='battle')setPaused(true);
+ }
+ async function enterMobileFullscreen(){
+  entered=true;syncMobileViewport();
+  try{if(!document.fullscreenElement&&document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){/* Browser UI remains visible when fullscreen is unavailable. */}
+  try{if(window.screen.orientation?.lock)await window.screen.orientation.lock('landscape');}catch(e){/* Rotation guidance is the fallback. */}
+  syncMobileViewport();
+ }
+ start.addEventListener('click',enterMobileFullscreen);fullscreen.addEventListener('click',enterMobileFullscreen);
+ window.addEventListener('resize',syncMobileViewport);mobileQuery.addEventListener('change',syncMobileViewport);
+ document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement&&screen==='battle')setPaused(true);syncMobileViewport();});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden&&screen==='battle')setPaused(true);});
+ syncMobileViewport();
+}
+
+if(typeof window.matchMedia==='function'){
+ const pad=document.getElementById('movePad'),buttons=[...document.querySelectorAll('#mobileControls [data-key]')];
+ let movePointer=null;
+ const held=new Map();
+ function releaseMobileControls(){
+  movePointer=null;held.clear();keys.left=keys.right=keys.dash=keys.guard=false;
+  pad.classList.remove('pressed');pad.dataset.direction='';pad.dataset.dash='false';
+  buttons.forEach(b=>b.classList.remove('pressed'));
+ }
+ function move(e){
+  if(e.pointerId!==movePointer)return;
+  const r=pad.getBoundingClientRect(),x=(e.clientX-r.left)/r.width;
+  keys.left=x<.43;keys.right=x>.57;keys.dash=x<.18||x>.82;
+  pad.dataset.direction=keys.left?'left':keys.right?'right':'';pad.dataset.dash=String(keys.dash);
+ }
+ pad.addEventListener('pointerdown',e=>{e.preventDefault();if(movePointer!==null||paused||selecting)return;movePointer=e.pointerId;pad.setPointerCapture(e.pointerId);pad.classList.add('pressed');move(e);});
+ pad.addEventListener('pointermove',move);
+ for(const type of ['pointerup','pointercancel','lostpointercapture'])pad.addEventListener(type,e=>{if(e.pointerId!==movePointer)return;movePointer=null;keys.left=keys.right=keys.dash=false;pad.classList.remove('pressed');pad.dataset.direction='';pad.dataset.dash='false';});
+ for(const b of buttons){
+  b.addEventListener('pointerdown',e=>{held.set(e.pointerId,b);b.classList.add('pressed');});
+  for(const type of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(type,e=>{held.delete(e.pointerId);const active=[...held.values()].includes(b);b.classList.toggle('pressed',active);if(b.dataset.key==='guard')keys.guard=active;});
+ }
+ document.getElementById('mobilePause').addEventListener('click',()=>{setPaused(!paused);releaseMobileControls();});
+ window.addEventListener('blur',releaseMobileControls);window.addEventListener('resize',releaseMobileControls);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)releaseMobileControls();});
+ new MutationObserver(releaseMobileControls).observe(document.querySelector('main'),{attributes:true,attributeFilter:['data-screen','data-paused']});
+}
+
+// Cover gaps and menu buttons as well as the canvas: Safari can otherwise
+// interpret rapid taps outside the individual controls as page zoom gestures.
+if(typeof window.matchMedia==='function'){
+ const surface=document.querySelector('main');
+ const preventGameZoom=e=>{if(document.body.classList.contains('mobile')&&e.cancelable)e.preventDefault();};
+ for(const type of ['dblclick','gesturestart','gesturechange'])surface.addEventListener(type,preventGameZoom,{passive:false});
+}
+
+// iOS double-tap zoom is a touch default action, not reliably a dblclick default.
+// Cancel touchend explicitly; preserve click-based menu buttons separately.
+if(typeof window.matchMedia==='function'){
+ const taps=new Map();
+ document.addEventListener('touchstart',e=>{
+  if(!document.body.classList.contains('mobile'))return;
+  for(const t of e.changedTouches){const button=t.target.closest?.('button');taps.set(t.identifier,{x:t.clientX,y:t.clientY,button,moved:false});}
+ },{passive:true});
+ document.addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches){const tap=taps.get(t.identifier);if(tap&&Math.hypot(t.clientX-tap.x,t.clientY-tap.y)>12)tap.moved=true;}
+ },{passive:true});
+ document.addEventListener('touchend',e=>{
+  if(!document.body.classList.contains('mobile')){taps.clear();return;}
+  if(e.cancelable)e.preventDefault();
+  for(const t of e.changedTouches){
+   const tap=taps.get(t.identifier);taps.delete(t.identifier);
+   if(tap?.button&&!tap.moved&&!tap.button.hasAttribute('data-key')&&tap.button.contains(document.elementFromPoint(t.clientX,t.clientY)))tap.button.click();
+  }
+ },{passive:false});
+ document.addEventListener('touchcancel',()=>taps.clear(),{passive:true});
 }
